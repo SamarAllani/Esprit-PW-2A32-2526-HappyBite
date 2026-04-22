@@ -3,15 +3,18 @@
 class Recette
 {
     private ?int $id_recette = null;
-    private ?string $nom = null;
-    private ?string $description = null;
-    private ?int $calories = null;
+    private string $nom;
+    private string $description;
+    private int $calories;
+    private ?string $image;
+    private int $mise_en_avant = 0;
 
-    public function __construct(?string $nom = null, ?string $description = null, ?int $calories = null)
+    public function __construct(string $nom, string $description, int $calories, ?string $image = null)
     {
         $this->nom = $nom;
         $this->description = $description;
         $this->calories = $calories;
+        $this->image = $image;
     }
 
     public function getIdRecette(): ?int
@@ -24,7 +27,7 @@ class Recette
         $this->id_recette = $id_recette;
     }
 
-    public function getNom(): ?string
+    public function getNom(): string
     {
         return $this->nom;
     }
@@ -34,24 +37,44 @@ class Recette
         $this->nom = $nom;
     }
 
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): void
+    public function setDescription(string $description): void
     {
         $this->description = $description;
     }
 
-    public function getCalories(): ?int
+    public function getCalories(): int
     {
         return $this->calories;
     }
 
-    public function setCalories(?int $calories): void
+    public function setCalories(int $calories): void
     {
         $this->calories = $calories;
+    }
+
+    public function getImage(): ?string
+    {
+        return $this->image;
+    }
+
+    public function setImage(?string $image): void
+    {
+        $this->image = $image;
+    }
+
+    public function getMiseEnAvant(): int
+    {
+        return $this->mise_en_avant;
+    }
+
+    public function setMiseEnAvant(int $mise_en_avant): void
+    {
+        $this->mise_en_avant = $mise_en_avant;
     }
 }
 ?>

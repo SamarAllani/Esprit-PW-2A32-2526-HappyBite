@@ -1,32 +1,59 @@
-
 <?php
 require_once '../../Controllers/ProduitController.php';
 require_once '../../Controllers/CategorieController.php';
+require_once '../../Controllers/FrigoController.php';
+require_once '../../Config.php';
 
 $produitController = new ProduitController();
 $categorieController = new CategorieController();
+$frigoController = new FrigoController();
 
 $categories = $categorieController->listCategories();
 
-// Bouton cliqué
 $action = $_GET['action'] ?? 'normal';
-
 $motCle = trim($_GET['motCle'] ?? '');
 $idCategorie = trim($_GET['id_categorie'] ?? '');
 
-// Profil simulé
-$allergie = "Lactose";
-$objectif = "perte de poids";
-$budget = 20;
+// PROFIL FIXE TEMPORAIRE
+$idUtilisateur = 12;
 
-// Choix logique
-if ($action === 'smart') {
+$db = Config::getConnexion();
+$stmt = $db->prepare("SELECT * FROM profil_sante WHERE id_utilisateur = :id_utilisateur LIMIT 1");
+$stmt->execute([
+    'id_utilisateur' => $idUtilisateur
+]);
+$profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_frigo'] ?? '') === 'ajouter_frigo') {
+    $idProduitAjout = (int)($_POST['id_produit'] ?? 0);
+    $quantiteAjout = (int)($_POST['quantite'] ?? 1);
+
+    if ($idProduitAjout > 0 && $quantiteAjout > 0) {
+        $frigoController->ajouterAuFrigo($idUtilisateur, $idProduitAjout, $quantiteAjout);
+    }
+
+    $queryParams = [
+        'action' => $action,
+        'motCle' => $motCle,
+        'id_categorie' => $idCategorie
+    ];
+
+    $queryString = http_build_query($queryParams);
+    $redirectUrl = 'List-Produit.php';
+    if (!empty($queryString)) {
+        $redirectUrl .= '?' . $queryString;
+    }
+    $redirectUrl .= '#produit-' . $idProduitAjout;
+
+    header('Location: ' . $redirectUrl);
+    exit;
+}
+
+if ($action === 'smart' && $profilSante) {
     $produits = $produitController->rechercherProduitsIntelligents(
+        $idUtilisateur,
         $motCle,
-        $idCategorie,
-        $allergie,
-        $objectif,
-        $budget
+        $idCategorie
     );
 } else {
     $produits = (!empty($motCle) || !empty($idCategorie))
@@ -44,16 +71,45 @@ if ($action === 'smart') {
 
     <link rel="stylesheet" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="/Views/assets/css/style.css">
+
+    <style>
+        .promo-card {
+            border: 2px solid #f0ad4e !important;
+            background: #fff8e1 !important;
+        }
+
+        .promo-badge {
+            display: inline-block;
+            background: #f0ad4e;
+            color: #fff;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+        }
+
+        .promo-old-price {
+            color: #8c8c8c;
+            text-decoration: line-through;
+            margin-right: 8px;
+        }
+
+        .promo-new-price {
+            color: #d97706;
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+    </style>
 </head>
 <body>
-<!-- NAVBAR ICI -->
+
 <nav class="main-navbar">
     <div class="nav-container">
-        
         <a href="index.php" class="nav-logo">
             <img src="../assets/images/logo.png" alt="HappyBite">
             <span>HappyBite</span>
         </a>
+
         <ul class="nav-links">
             <li><a href="index.php">Accueil</a></li>
             <li><a href="List-Produit.php" class="active">Produits</a></li>
@@ -62,14 +118,14 @@ if ($action === 'smart') {
         </ul>
 
         <div class="nav-user">
-            <a href="#" class="nav-action">Frigo</a>
+            <a href="List-Frigo.php" class="nav-action">Frigo</a>
             <a href="#" class="nav-action">Commandes</a>
             <a href="#" class="nav-action">Santé</a>
             <a href="#" class="nav-profile">Profil</a>
         </div>
-
     </div>
 </nav>
+
 <div class="container py-5">
 
     <div class="text-center mb-4">
@@ -86,46 +142,67 @@ if ($action === 'smart') {
         </a>
     </div>
 
-    <?php if ($action === 'smart') { ?>
+    <?php if ($action === 'smart' && $profilSante) { ?>
         <div class="alert alert-success text-center shadow-sm">
             <strong>Mode personnalisé activé :</strong><br>
-            Allergie : <?php echo htmlspecialchars($allergie); ?> |
-            Objectif : <?php echo htmlspecialchars($objectif); ?> |
-            Budget : <?php echo htmlspecialchars($budget); ?> DT
+            <?php
+            $infos = [];
+
+            if (!empty($profilSante['allergenes'])) {
+                $infos[] = "Allergènes : " . htmlspecialchars($profilSante['allergenes']);
+            }
+
+            if (!empty($profilSante['carences'])) {
+                $infos[] = "Carences : " . htmlspecialchars($profilSante['carences']);
+            }
+
+            if (!empty($profilSante['maladies'])) {
+                $infos[] = "Maladies : " . htmlspecialchars($profilSante['maladies']);
+            }
+
+            if (!empty($profilSante['objectif'])) {
+                $infos[] = "Objectif : " . htmlspecialchars($profilSante['objectif']);
+            }
+
+            echo implode(' | ', $infos);
+            ?>
+        </div>
+    <?php } elseif ($action === 'smart') { ?>
+        <div class="alert alert-warning text-center shadow-sm">
+            Aucun profil santé trouvé pour l'utilisateur fixe.
         </div>
     <?php } else { ?>
         <div class="alert alert-secondary text-center shadow-sm">
             Affichage normal de tous les produits
         </div>
     <?php } ?>
-        <!-- SECTION NOS RAYONS ICI -->
-<!-- SECTION NOS RAYONS -->
-<div class="rayons-section mb-4">
-    <div class="rayons-header mb-3">
-        <h4 class="mb-2">Nos rayons</h4>
-        <p class="mb-0">
-            Nos produits sont organisés par catégories pour vous aider.
-        </p>
-    </div>
 
-    <?php if (!empty($categories)) { ?>
-        <div class="rayons-scroll">
-            <?php foreach ($categories as $categorie) { ?>
-                <div class="rayon-card-mini">
-                    <h5><?php echo htmlspecialchars($categorie->getNom()); ?></h5>
-                    <p>
-                        <?php
-                        $description = trim($categorie->getDescription() ?? '');
-                        echo !empty($description)
-                            ? htmlspecialchars($description)
-                            : 'Découvrez les produits de cette catégorie dans notre catalogue.';
-                        ?>
-                    </p>
-                </div>
-            <?php } ?>
+    <div class="rayons-section mb-4">
+        <div class="rayons-header mb-3">
+            <h4 class="mb-2">Nos rayons</h4>
+            <p class="mb-0">
+                Nos produits sont organisés par catégories pour vous aider.
+            </p>
         </div>
-    <?php } ?>
-</div>
+
+        <?php if (!empty($categories)) { ?>
+            <div class="rayons-scroll">
+                <?php foreach ($categories as $categorie) { ?>
+                    <div class="rayon-card-mini">
+                        <h5><?php echo htmlspecialchars($categorie->getNom()); ?></h5>
+                        <p>
+                            <?php
+                            $description = trim($categorie->getDescription() ?? '');
+                            echo !empty($description)
+                                ? htmlspecialchars($description)
+                                : 'Découvrez les produits de cette catégorie dans notre catalogue.';
+                            ?>
+                        </p>
+                    </div>
+                <?php } ?>
+            </div>
+        <?php } ?>
+    </div>
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
@@ -134,13 +211,13 @@ if ($action === 'smart') {
 
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label for="motCle" class="form-label">Rechercher un produit</label>
+                        <label for="motCle" class="form-label">Rechercher un produit ou un fournisseur</label>
                         <input
                             type="text"
                             class="form-control"
                             id="motCle"
                             name="motCle"
-                            placeholder="Nom du produit..."
+                            placeholder="Nom du produit, fournisseur ou promo..."
                             value="<?php echo htmlspecialchars($motCle); ?>"
                         >
                     </div>
@@ -178,10 +255,17 @@ if ($action === 'smart') {
                 <?php
                 $allergenes = array_filter(array_map('trim', explode(',', $produit['allergene'] ?? '')));
                 $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?? '')));
+                $isPromo = isset($produit['promo']) && $produit['promo'] !== null && $produit['promo'] !== '';
                 ?>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 shadow-sm border-0 rounded-4">
+                    <div class="card h-100 shadow-sm rounded-4 <?php echo $isPromo ? 'promo-card' : 'border-0'; ?>" id="produit-<?php echo $produit['id_produit']; ?>">
                         <div class="card-body d-flex flex-column">
+
+                            <?php if ($isPromo) { ?>
+                                <div class="mb-2">
+                                    <span class="promo-badge">En promo</span>
+                                </div>
+                            <?php } ?>
 
                             <div class="text-center mb-3">
                                 <?php if (!empty($produit['image'])) { ?>
@@ -206,10 +290,26 @@ if ($action === 'smart') {
                             </div>
 
                             <p class="mb-2">
-                                <strong>Prix :</strong>
-                                <span class="text-success fw-bold">
-                                    <?php echo htmlspecialchars($produit['prix']); ?> DT
+                                <strong>Fournisseur :</strong>
+                                <span class="fw-semibold text-dark">
+                                    <?php echo htmlspecialchars($produit['nom_fournisseur'] ?? 'Non renseigné'); ?>
                                 </span>
+                            </p>
+
+                            <p class="mb-2">
+                                <strong>Prix :</strong>
+                                <?php if ($isPromo) { ?>
+                                    <span class="promo-old-price">
+                                        <?php echo htmlspecialchars($produit['prix']); ?> DT
+                                    </span>
+                                    <span class="promo-new-price">
+                                        <?php echo htmlspecialchars($produit['promo']); ?> DT
+                                    </span>
+                                <?php } else { ?>
+                                    <span class="text-success fw-bold">
+                                        <?php echo htmlspecialchars($produit['prix']); ?> DT
+                                    </span>
+                                <?php } ?>
                             </p>
 
                             <p class="mb-2">
@@ -244,10 +344,43 @@ if ($action === 'smart') {
                             </div>
 
                             <div class="mt-auto">
-                                <a href="Detail-Produit.php?id=<?php echo $produit['id_produit']; ?>"
-                                   class="btn btn-outline-success w-100 rounded-pill">
-                                    Voir détails
-                                </a>
+                                <div class="row g-2 align-items-end">
+
+                                    <div class="col-4">
+                                        <a href="Detail-Produit.php?id=<?php echo $produit['id_produit']; ?>"
+                                           class="btn btn-outline-success w-100 rounded-pill btn-sm">
+                                            Détails
+                                        </a>
+                                    </div>
+
+                                    <div class="col-4">
+                                        <button type="button"
+                                                class="btn btn-warning w-100 rounded-pill btn-sm"
+                                                disabled>
+                                            Panier
+                                        </button>
+                                    </div>
+
+                                    <div class="col-4">
+                                        <form method="POST" class="m-0">
+                                            <input type="hidden" name="action_frigo" value="ajouter_frigo">
+                                            <input type="hidden" name="id_produit" value="<?php echo $produit['id_produit']; ?>">
+
+                                            <input
+                                                type="number"
+                                                name="quantite"
+                                                min="1"
+                                                value="1"
+                                                class="form-control form-control-sm text-center rounded-pill mb-1"
+                                            >
+
+                                            <button type="submit" class="btn btn-success w-100 rounded-pill btn-sm">
+                                                Frigo
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                </div>
                             </div>
 
                         </div>

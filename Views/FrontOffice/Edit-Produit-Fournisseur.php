@@ -1,44 +1,3 @@
-<div class="admin-layout">
-    <aside class="admin-sidebar">
-        <div class="admin-sidebar-header">
-        <a href="#" class="admin-logo">
-            <img src="../assets/images/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>        </div>
-
-        <nav class="admin-main-menu">
-            <a href="#" class="admin-main-link active">Produit</a>
-            <a href="#" class="admin-main-link">Communauté</a>
-            <a href="#" class="admin-main-link">Post</a>
-            <a href="#" class="admin-main-link">Utilisateur</a>
-            <a href="#" class="admin-main-link">Santé</a>
-        </nav>
-    </aside>
-
-    <main class="admin-content">
-        <!-- sous-nav produit ici -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarBack">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Produit.php">Produits</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Categorie.php">Catégories</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
 <?php
 include '../../Controllers/ProduitController.php';
 include '../../Controllers/CategorieController.php';
@@ -51,7 +10,8 @@ $produitController = new ProduitController();
 $categorieController = new CategorieController();
 $categories = $categorieController->listCategories();
 
-// Listes fixes
+$idFournisseur = 2; // temporaire
+
 $listeAllergenes = [
     'Gluten',
     'Lactose',
@@ -72,19 +32,51 @@ $listeBenefices = [
     'Protéines'
 ];
 
+// Vérification de l'id
+if (!isset($_GET['id']) || empty($_GET['id'])) {
+    die("ID du produit manquant.");
+}
+
+$id = (int) $_GET['id'];
+
+// On récupère uniquement un produit appartenant au fournisseur
+$produitData = $produitController->getProduitByIdAndUtilisateur($id, $idFournisseur);
+
+if (!$produitData) {
+    die("Produit introuvable ou accès refusé.");
+}
+
+// Préremplissage
+$nom = $produitData['nom'] ?? '';
+$prix = $produitData['prix'] ?? '';
+$image = $produitData['image'] ?? '';
+$calories = $produitData['calories'] ?? '';
+$id_categorie = $produitData['id_categorie'] ?? '';
+$id_utilisateur = $produitData['id_utilisateur'] ?? $idFournisseur;
+$date_ajout = $produitData['date_ajout'] ?? date('Y-m-d');
+
+$allergenesSelectionnes = !empty($produitData['allergene'])
+    ? array_map('trim', explode(',', $produitData['allergene']))
+    : [];
+
+$beneficesSelectionnes = !empty($produitData['benefices'])
+    ? array_map('trim', explode(',', $produitData['benefices']))
+    : [];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom = trim($_POST['nom'] ?? '');
     $prix = trim($_POST['prix'] ?? '');
     $calories = trim($_POST['calories'] ?? '');
     $id_categorie = trim($_POST['id_categorie'] ?? '');
 
-    $allergenes = $_POST['allergenes'] ?? [];
-    $beneficesList = $_POST['benefices_list'] ?? [];
+    $allergenesSelectionnes = $_POST['allergenes'] ?? [];
+    $beneficesSelectionnes = $_POST['benefices_list'] ?? [];
 
-    $allergene = implode(',', $allergenes);
-    $benefices = implode(',', $beneficesList);
+    $allergene = implode(',', $allergenesSelectionnes);
+    $benefices = implode(',', $beneficesSelectionnes);
 
-    $image = "";
+    // on garde l'ancienne image par défaut
+    $image = $produitData['image'] ?? '';
     $errors = [];
 
     // ===== NOM =====
@@ -93,23 +85,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (mb_strlen($nom) < 2) {
-     $errors[] = "Le nom du produit doit contenir au moins 2 caractères.";
+        $errors[] = "Le nom du produit doit contenir au moins 2 caractères.";
     }
 
-    // caractères autorisés
     if ($nom !== '' && !preg_match("/^[a-zA-ZÀ-ÿ0-9\s%\-\'()]+$/u", $nom)) {
-            $errors[] = "Le nom du produit contient des caractères non autorisés.";
+        $errors[] = "Le nom du produit contient des caractères non autorisés.";
     }
 
-    // au moins 3 lettres
     preg_match_all('/[a-zA-ZÀ-ÿ]/u', $nom, $matches);
     if ($nom !== '' && count($matches[0]) < 3) {
-         $errors[] = "Le nom du produit doit contenir au moins 3 lettres.";
+        $errors[] = "Le nom du produit doit contenir au moins 3 lettres.";
     }
 
-    // pas uniquement des chiffres / symboles / espaces
     if ($nom !== '' && !preg_match('/[a-zA-ZÀ-ÿ]/u', $nom)) {
-            $errors[] = "Le nom du produit ne peut pas être composé uniquement de chiffres ou de symboles.";
+        $errors[] = "Le nom du produit ne peut pas être composé uniquement de chiffres ou de symboles.";
     }
 
     // ===== PRIX =====
@@ -137,27 +126,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = "La catégorie est obligatoire.";
     }
 
-    // ===== IMAGE OBLIGATOIRE =====
-    if (!isset($_FILES['image']) || $_FILES['image']['error'] === 4) {
-        $errors[] = "L'image du produit est obligatoire.";
-    } else {
-        $originalName = $_FILES['image']['name'];
-        $tmpName = $_FILES['image']['tmp_name'];
+    // ===== IMAGE OPTIONNELLE EN MODIFICATION =====
+    if (isset($_FILES['image']) && $_FILES['image']['error'] !== 4) {
+        if ($_FILES['image']['error'] === 0) {
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $originalName = $_FILES['image']['name'];
+            $tmpName = $_FILES['image']['tmp_name'];
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
-        $newFileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
-        $uploadDir = __DIR__ . '/../../uploads/';
-        $uploadPath = $uploadDir . $newFileName;
+            if (!in_array($extension, $allowedExtensions)) {
+                $errors[] = "Format d'image non autorisé. Utilise jpg, jpeg, png, gif ou webp.";
+            } else {
+                $newFileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+                $uploadDir = __DIR__ . '/../../uploads/';
 
-        if (move_uploaded_file($tmpName, $uploadPath)) {
-            $image = $newFileName;
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $uploadPath = $uploadDir . $newFileName;
+
+                if (move_uploaded_file($tmpName, $uploadPath)) {
+                    $image = $newFileName;
+                } else {
+                    $errors[] = "Erreur lors de l'upload de l'image.";
+                }
+            }
         } else {
-            $errors[] = "Erreur lors de l'upload de l'image.";
+            $errors[] = "Erreur lors du téléchargement de l'image.";
         }
     }
-
-    // Temporaire : plus tard tu mettras l'utilisateur connecté
-    $id_utilisateur = 1;
-    $date_ajout = date('Y-m-d');
 
     if (!empty($errors)) {
         $error = implode(" ",$errors);
@@ -174,9 +172,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (int)$id_categorie
         );
 
-        $produitController->addProduit($produit);
+        $produitController->updateProduitByUtilisateur($produit, $id, $idFournisseur);
 
-        header('Location: List-Produit.php');
+        header('Location: List-Produit-Fournisseur.php');
         exit;
     }
 }
@@ -186,11 +184,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Ajouter un produit</title>
+    <title>Modifier mon produit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" type="text/css" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="/Views/assets/css/style.css">
+
+    <style>
+        .image-preview {
+            max-width: 140px;
+            max-height: 140px;
+            border-radius: 12px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            object-fit: cover;
+            display: block;
+        }
+    </style>
 </head>
 <body>
 
@@ -199,14 +209,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="col-lg-8">
 
             <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h3 class="mb-0">Ajouter un produit</h3>
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0">Modifier mon produit</h3>
                 </div>
 
                 <div class="card-body">
                     <?php if (!empty($error)) { ?>
                         <div class="alert alert-danger">
-                            <?php echo htmlspecialchars($error); ?>
+                            <?php echo $error; ?>
                         </div>
                     <?php } ?>
 
@@ -218,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 class="form-control"
                                 id="nom"
                                 name="nom"
-                                value="<?php echo isset($_POST['nom']) ? htmlspecialchars($_POST['nom']) : ''; ?>"
+                                value="<?php echo htmlspecialchars($nom); ?>"
                             >
                         </div>
 
@@ -229,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 class="form-control"
                                 id="prix"
                                 name="prix"
-                                value="<?php echo isset($_POST['prix']) ? htmlspecialchars($_POST['prix']) : ''; ?>"
+                                value="<?php echo htmlspecialchars($prix); ?>"
                             >
                         </div>
 
@@ -242,6 +252,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 name="image"
                                 accept="image/*"
                             >
+
+                            <small class="text-muted d-block mt-2">Aperçu :</small>
+
+                            <?php if (!empty($image)) { ?>
+                                <img
+                                    id="imagePreview"
+                                    src="/uploads/<?php echo htmlspecialchars($image); ?>"
+                                    alt="Image du produit"
+                                    class="image-preview"
+                                >
+                            <?php } else { ?>
+                                <img
+                                    id="imagePreview"
+                                    src=""
+                                    alt="Aperçu image"
+                                    class="image-preview"
+                                    style="display:none;"
+                                >
+                            <?php } ?>
                         </div>
 
                         <div class="mb-3">
@@ -251,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 class="form-control"
                                 id="calories"
                                 name="calories"
-                                value="<?php echo isset($_POST['calories']) ? htmlspecialchars($_POST['calories']) : ''; ?>"
+                                value="<?php echo htmlspecialchars($calories); ?>"
                             >
                         </div>
 
@@ -262,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <?php foreach ($categories as $categorie) { ?>
                                     <option
                                         value="<?php echo $categorie->getIdCategorie(); ?>"
-                                        <?php echo (isset($_POST['id_categorie']) && $_POST['id_categorie'] == $categorie->getIdCategorie()) ? 'selected' : ''; ?>
+                                        <?php echo ($id_categorie == $categorie->getIdCategorie()) ? 'selected' : ''; ?>
                                     >
                                         <?php echo htmlspecialchars($categorie->getNom()); ?>
                                     </option>
@@ -280,7 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         name="allergenes[]"
                                         value="<?php echo $item; ?>"
                                         id="allergene_<?php echo md5($item); ?>"
-                                        <?php echo (isset($_POST['allergenes']) && in_array($item, $_POST['allergenes'])) ? 'checked' : ''; ?>
+                                        <?php echo in_array($item, $allergenesSelectionnes) ? 'checked' : ''; ?>
                                     >
                                     <label class="form-check-label" for="allergene_<?php echo md5($item); ?>">
                                         <?php echo htmlspecialchars($item); ?>
@@ -299,7 +328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         name="benefices_list[]"
                                         value="<?php echo $item; ?>"
                                         id="benefice_<?php echo md5($item); ?>"
-                                        <?php echo (isset($_POST['benefices_list']) && in_array($item, $_POST['benefices_list'])) ? 'checked' : ''; ?>
+                                        <?php echo in_array($item, $beneficesSelectionnes) ? 'checked' : ''; ?>
                                     >
                                     <label class="form-check-label" for="benefice_<?php echo md5($item); ?>">
                                         <?php echo htmlspecialchars($item); ?>
@@ -309,8 +338,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="List-Produit.php" class="btn btn-secondary">Retour</a>
-                            <button type="submit" class="btn btn-success">Ajouter</button>
+                            <a href="List-Produit-Fournisseur.php" class="btn btn-secondary">Retour</a>
+                            <button type="submit" class="btn btn-warning">Modifier</button>
                         </div>
                     </form>
                 </div>
@@ -321,5 +350,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<script>
+document.getElementById('image').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('imagePreview');
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+</script>
+
 </body>
 </html>

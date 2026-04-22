@@ -1,45 +1,3 @@
-<div class="admin-layout">
-    <aside class="admin-sidebar">
-        <div class="admin-sidebar-header">
-        <a href="#" class="admin-logo">
-            <img src="../assets/images/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>        
-    </div>
-
-        <nav class="admin-main-menu">
-            <a href="#" class="admin-main-link active">Produit</a>
-            <a href="#" class="admin-main-link">Communauté</a>
-            <a href="#" class="admin-main-link">Post</a>
-            <a href="#" class="admin-main-link">Utilisateur</a>
-            <a href="#" class="admin-main-link">Santé</a>
-        </nav>
-    </aside>
-
-    <main class="admin-content">
-        <!-- sous-nav produit ici -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarBack">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Produit.php">Produits</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Categorie.php">Catégories</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
 <?php
 include '../../Controllers/RecetteController.php';
 
@@ -57,6 +15,60 @@ if (isset($_GET['delete'])) {
 }
 
 $motCle = trim($_GET['motCle'] ?? '');
+
+/*
+|--------------------------------------------------------------------------
+| Export Excel
+|--------------------------------------------------------------------------
+| - Si recherche active : export des résultats affichés
+| - Sinon : export de toute la liste
+| - Toutes les colonnes utiles sauf l'image
+*/
+if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
+    if (!empty($motCle)) {
+        $recettesExport = $recetteController->rechercherRecettes($motCle);
+        $nomFichier = 'recettes_filtrees.xls';
+    } else {
+        $recettesExport = $recetteController->listRecettes();
+        $nomFichier = 'recettes.xls';
+    }
+
+    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
+    header("Content-Disposition: attachment; filename=\"$nomFichier\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    echo "\xEF\xBB\xBF";
+
+    echo "<table border='1'>";
+    echo "<tr>";
+    echo "<th>ID</th>";
+    echo "<th>Nom</th>";
+    echo "<th>Calories</th>";
+    echo "<th>Produits</th>";
+    echo "</tr>";
+
+    foreach ($recettesExport as $recette) {
+        $produitsRecette = $recetteController->getProduitsByRecette($recette['id_recette']);
+        $nomsProduits = [];
+
+        if (!empty($produitsRecette)) {
+            foreach ($produitsRecette as $produit) {
+                $nomsProduits[] = $produit['nom'];
+            }
+        }
+
+        echo "<tr>";
+        echo "<td>" . htmlspecialchars($recette['id_recette'] ?? '') . "</td>";
+        echo "<td>" . htmlspecialchars($recette['nom'] ?? '') . "</td>";
+        echo "<td>" . htmlspecialchars($recette['calories'] ?? 0) . "</td>";
+        echo "<td>" . htmlspecialchars(!empty($nomsProduits) ? implode(', ', $nomsProduits) : 'Aucun produit') . "</td>";
+        echo "</tr>";
+    }
+
+    echo "</table>";
+    exit;
+}
 
 if (!empty($motCle)) {
     $recettes = $recetteController->rechercherRecettes($motCle);
@@ -76,115 +88,181 @@ if (!empty($motCle)) {
 </head>
 <body>
 
-<div class="container py-5">
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-1">Liste des recettes</h2>
-            <p class="text-muted mb-0">Gérez les recettes du catalogue</p>
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-header">
+            <a href="#" class="admin-logo">
+                <img src="../assets/images/logo.png" alt="HappyBite">
+                <span>HappyBite</span>
+            </a>
         </div>
-        <a href="Add-Recette.php" class="btn btn-success rounded-pill px-4">
-            Ajouter une recette
-        </a>
-    </div>
 
-    <div class="card shadow-sm border-0 mb-4 rounded-4">
-        <div class="card-body">
-            <form method="GET" action="">
-                <div class="row g-3">
-                    <div class="col-md-10">
-                        <label for="motCle" class="form-label fw-semibold">Rechercher une recette</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            id="motCle"
-                            name="motCle"
-                            placeholder="Nom de la recette..."
-                            value="<?php echo htmlspecialchars($motCle); ?>"
-                        >
-                    </div>
+        <nav class="admin-main-menu">
+            <a href="#" class="admin-main-link active">Produit</a>
+            <a href="#" class="admin-main-link">Communauté</a>
+            <a href="#" class="admin-main-link">Post</a>
+            <a href="#" class="admin-main-link">Utilisateur</a>
+            <a href="#" class="admin-main-link">Santé</a>
+        </nav>
+    </aside>
 
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100 rounded-pill">
-                            Rechercher
-                        </button>
-                    </div>
-                </div>
-            </form>
+    <main class="admin-content">
+        <div class="container mt-4">
+            <div class="d-flex justify-content-end flex-wrap gap-3">
+                <a href="List-Produit.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+                    Produits
+                </a>
+
+                <a href="List-Recette.php" class="btn btn-success rounded-pill px-4 py-2">
+                    Recettes
+                </a>
+
+                <a href="List-Categorie.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+                    Catégories
+                </a>
+
+                <a href="List-Frigo-Back.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+                    Frigo
+                </a>
+
+                <a href="Dashboard-Produit.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+                    Dashboard
+                </a>
+
+            </div>
         </div>
-    </div>
 
-    <div class="card shadow border-0 rounded-4">
-        <div class="card-body">
-            <?php if (empty($recettes)) { ?>
-                <div class="alert alert-info mb-0 text-center">
-                    Aucune recette trouvée.
+        <div class="container py-5">
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold mb-1">Liste des recettes</h2>
+                    <p class="text-muted mb-0">Gérez les recettes du catalogue</p>
                 </div>
-            <?php } else { ?>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle">
-                        <thead class="table-light text-center">
-                            <tr>
-                                <th>ID</th>
-                                <th>Nom</th>
-                                <th>Description</th>
-                                <th>Calories</th>
-                                <th>Produits</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($recettes as $recette) { ?>
-                                <?php $produitsRecette = $recetteController->getProduitsByRecette($recette['id_recette']); ?>
-                                <tr>
-                                    <td class="text-center"><?php echo htmlspecialchars($recette['id_recette']); ?></td>
+                <a href="Add-Recette.php" class="btn btn-success rounded-pill px-4">
+                    Ajouter une recette
+                </a>
+            </div>
 
-                                    <td>
-                                        <strong><?php echo htmlspecialchars($recette['nom']); ?></strong>
-                                    </td>
+            <div class="card shadow-sm border-0 mb-4 rounded-4">
+                <div class="card-body">
+                    <form method="GET" action="">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label for="motCle" class="form-label fw-semibold">Rechercher une recette</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="motCle"
+                                    name="motCle"
+                                    placeholder="Nom de la recette..."
+                                    value="<?php echo htmlspecialchars($motCle); ?>"
+                                >
+                            </div>
 
-                                    <td>
-                                        <?php echo htmlspecialchars($recette['description']); ?>
-                                    </td>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success w-100 rounded-pill">
+                                    Rechercher
+                                </button>
+                            </div>
 
-                                    <td class="text-center">
-                                        <?php echo htmlspecialchars($recette['calories'] ?? 0); ?> cal
-                                    </td>
-
-                                    <td>
-                                        <?php if (!empty($produitsRecette)) { ?>
-                                            <?php foreach ($produitsRecette as $produit) { ?>
-                                                <span class="badge bg-success me-1 mb-1">
-                                                    <?php echo htmlspecialchars($produit['nom']); ?>
-                                                </span>
-                                            <?php } ?>
-                                        <?php } else { ?>
-                                            <span class="text-muted">Aucun produit</span>
-                                        <?php } ?>
-                                    </td>
-
-                                    <td class="text-center">
-                                        <a href="Edit-Recette.php?id=<?php echo $recette['id_recette']; ?>" class="btn btn-warning btn-sm me-1 mb-1">
-                                            Modifier
-                                        </a>
-
-                                        <a
-                                            href="List-Recette.php?delete=<?php echo $recette['id_recette']; ?>"
-                                            class="btn btn-danger btn-sm mb-1"
-                                            onclick="return confirm('Voulez-vous vraiment supprimer cette recette ?');"
-                                        >
-                                            Supprimer
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php } ?>
-                        </tbody>
-                    </table>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" name="export_excel" value="1" class="btn btn-outline-success w-100 rounded-pill">
+                                    Exporter Excel
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-            <?php } ?>
+            </div>
+
+            <div class="card shadow border-0 rounded-4">
+                <div class="card-body">
+                    <?php if (empty($recettes)) { ?>
+                        <div class="alert alert-info mb-0 text-center">
+                            Aucune recette trouvée.
+                        </div>
+                    <?php } else { ?>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover align-middle">
+                                <thead class="table-light text-center">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nom</th>
+                                        <th>Image</th>
+                                        <th>Calories</th>
+                                        <th>Produits</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recettes as $recette) { ?>
+                                        <?php $produitsRecette = $recetteController->getProduitsByRecette($recette['id_recette']); ?>
+                                        <tr>
+                                            <td class="text-center">
+                                                <?php echo htmlspecialchars($recette['id_recette']); ?>
+                                            </td>
+
+                                            <td>
+                                                <strong><?php echo htmlspecialchars($recette['nom']); ?></strong>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <?php if (!empty($recette['image'])) { ?>
+                                                    <img
+                                                        src="/uploads/<?php echo htmlspecialchars($recette['image']); ?>"
+                                                        alt="Image recette"
+                                                        style="width: 70px; height: 70px; object-fit: cover; border-radius: 10px;"
+                                                    >
+                                                <?php } else { ?>
+                                                    <span class="text-muted">Aucune</span>
+                                                <?php } ?>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <?php echo htmlspecialchars($recette['calories'] ?? 0); ?> cal
+                                            </td>
+
+                                            <td>
+                                                <?php if (!empty($produitsRecette)) { ?>
+                                                    <?php foreach ($produitsRecette as $produit) { ?>
+                                                        <span class="badge bg-success me-1 mb-1">
+                                                            <?php echo htmlspecialchars($produit['nom']); ?>
+                                                        </span>
+                                                    <?php } ?>
+                                                <?php } else { ?>
+                                                    <span class="text-muted">Aucun produit</span>
+                                                <?php } ?>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <a href="Detail-Recette.php?id=<?php echo $recette['id_recette']; ?>" class="btn btn-info btn-sm me-1 mb-1">
+                                                    Voir détail
+                                                </a>
+
+                                                <a href="Edit-Recette.php?id=<?php echo $recette['id_recette']; ?>" class="btn btn-warning btn-sm me-1 mb-1">
+                                                    Modifier
+                                                </a>
+
+                                                <a
+                                                    href="List-Recette.php?delete=<?php echo $recette['id_recette']; ?>"
+                                                    class="btn btn-danger btn-sm mb-1"
+                                                    onclick="return confirm('Voulez-vous vraiment supprimer cette recette ?');"
+                                                >
+                                                    Supprimer
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php } ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php } ?>
+                </div>
+            </div>
+
         </div>
-    </div>
-
+    </main>
 </div>
 
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

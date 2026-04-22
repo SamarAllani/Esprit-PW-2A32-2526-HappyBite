@@ -1,23 +1,3 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="#">SmartBite</a>
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarFront">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarFront">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link active" href="List-Produit.php">Produits</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
 <?php
 include '../../Controllers/RecetteController.php';
 
@@ -28,6 +8,9 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 }
 
 $id = intval($_GET['id']);
+$action = $_GET['action'] ?? 'normal';
+$motCle = $_GET['motCle'] ?? '';
+
 $recette = $recetteController->showRecetteDetails($id);
 
 if (!$recette) {
@@ -48,10 +31,9 @@ $produitsRecette = $recetteController->getProduitsByRecette($id);
     <link rel="stylesheet" type="text/css" href="/Views/assets/css/style.css">
 </head>
 <body>
-<!-- NAVBAR ICI -->
+
 <nav class="main-navbar">
     <div class="nav-container">
-        
         <a href="index.php" class="nav-logo">
             <img src="../assets/images/logo.png" alt="HappyBite">
             <span>HappyBite</span>
@@ -69,9 +51,9 @@ $produitsRecette = $recetteController->getProduitsByRecette($id);
             <a href="#" class="nav-action">Santé</a>
             <a href="#" class="nav-profile">Profil</a>
         </div>
-
     </div>
 </nav>
+
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
@@ -84,6 +66,19 @@ $produitsRecette = $recetteController->getProduitsByRecette($id);
                     <div class="mb-4">
                         <h2 class="fw-bold mb-2"><?php echo htmlspecialchars($recette['nom']); ?></h2>
                         <p class="text-muted mb-0"><?php echo htmlspecialchars($recette['description']); ?></p>
+                    </div>
+
+                    <div class="mb-4 text-center">
+                        <h5 class="fw-bold mb-3">Image de la recette</h5>
+                        <?php if (!empty($recette['image'])) { ?>
+                            <img
+                                src="/uploads/<?php echo htmlspecialchars($recette['image']); ?>"
+                                alt="<?php echo htmlspecialchars($recette['nom']); ?>"
+                                style="max-width: 280px; max-height: 280px; object-fit: cover; border-radius: 16px;"
+                            >
+                        <?php } else { ?>
+                            <p class="text-muted mb-0">Aucune image définie.</p>
+                        <?php } ?>
                     </div>
 
                     <div class="mb-4">
@@ -154,7 +149,10 @@ $produitsRecette = $recetteController->getProduitsByRecette($id);
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="List-Recette.php" class="btn btn-secondary rounded-pill">Retour à la liste</a>
+                        <a href="List-Recette.php?action=<?php echo urlencode($action); ?>&motCle=<?php echo urlencode($motCle); ?>"
+                           class="btn btn-secondary rounded-pill">
+                            Retour à la liste
+                        </a>
                         <a href="#" class="btn btn-success rounded-pill">Essayer cette recette</a>
                     </div>
                 </div>

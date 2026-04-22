@@ -134,27 +134,30 @@ if (!empty($motCle)) {
     </aside>
 
     <main class="admin-content">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-            <div class="container">
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+<div class="container mt-4">
+    <div class="d-flex justify-content-end flex-wrap gap-3">
+        <a href="List-Produit.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+            Produits
+        </a>
 
-                <div class="collapse navbar-collapse" id="navbarBack">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="List-Produit.php">Produits</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="List-Recette.php">Recettes</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="List-Categorie.php">Catégories</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
+        <a href="List-Recette.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+            Recettes
+        </a>
+
+        <a href="List-Categorie.php" class="btn btn-success rounded-pill px-4 py-2">
+            Catégories
+        </a>
+
+        <a href="List-Frigo-Back.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+            Frigo
+        </a>
+
+        <a href="Dashboard-Produit.php" class="btn btn-outline-success rounded-pill px-4 py-2">
+            Dashboard
+        </a>
+
+    </div>
+</div>
 
         <div class="container py-5">
 

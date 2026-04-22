@@ -1,11 +1,11 @@
 <div class="admin-layout">
     <aside class="admin-sidebar">
         <div class="admin-sidebar-header">
-        <a href="#" class="admin-logo">
-            <img src="../assets/images/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>
-    </div>
+            <a href="#" class="admin-logo">
+                <img src="../assets/images/logo.png" alt="HappyBite">
+                <span>HappyBite</span>
+            </a>
+        </div>
 
         <nav class="admin-main-menu">
             <a href="#" class="admin-main-link active">Produit</a>
@@ -18,28 +18,28 @@
 
     <main class="admin-content">
         <!-- sous-nav produit ici -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+            <div class="container">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+                <div class="collapse navbar-collapse" id="navbarBack">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="List-Produit.php">Produits</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="List-Recette.php">Recettes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="List-Categorie.php">Catégories</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
 
-        <div class="collapse navbar-collapse" id="navbarBack">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Produit.php">Produits</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Categorie.php">Catégories</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
 <?php
 include '../../Controllers/ProduitController.php';
 include '../../Controllers/CategorieController.php';
@@ -87,7 +87,7 @@ if (!$produitData) {
     die("Produit introuvable.");
 }
 
-// Préremplissage initial avec les données existantes
+// Préremplissage initial
 $nom = $produitData['nom'] ?? '';
 $prix = $produitData['prix'] ?? '';
 $image = $produitData['image'] ?? '';
@@ -104,7 +104,6 @@ $beneficesSelectionnes = !empty($produitData['benefices'])
     ? array_map('trim', explode(',', $produitData['benefices']))
     : [];
 
-// Traitement du formulaire
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom = trim($_POST['nom'] ?? '');
     $prix = trim($_POST['prix'] ?? '');
@@ -117,62 +116,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allergene = implode(',', $allergenesSelectionnes);
     $benefices = implode(',', $beneficesSelectionnes);
 
-    // Garder l'ancienne image si aucune nouvelle n'est envoyée
+    // on garde l'ancienne image par défaut
     $image = $produitData['image'] ?? '';
+    $errors = [];
 
-    // Upload nouvelle image
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        $originalName = $_FILES['image']['name'];
-        $tmpName = $_FILES['image']['tmp_name'];
-        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    // ===== NOM =====
+    if ($nom === '') {
+        $errors[] = "Le nom du produit est obligatoire.";
+    }
 
-        if (!in_array($extension, $allowedExtensions)) {
-            $error = "Format d'image non autorisé. Utilise jpg, jpeg, png, gif ou webp.";
-        } else {
-            $newFileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
-            $uploadDir = __DIR__ . '/../../uploads/';
-            $uploadPath = $uploadDir . $newFileName;
+    if (mb_strlen($nom) < 2) {
+        $errors[] = "Le nom du produit doit contenir au moins 2 caractères.";
+    }
 
-            if (move_uploaded_file($tmpName, $uploadPath)) {
-                $image = $newFileName;
-            } else {
-                $error = "Erreur lors de l'upload de l'image.";
-            }
+    // caractères autorisés
+    if ($nom !== '' && !preg_match("/^[a-zA-ZÀ-ÿ0-9\s%\-\'()]+$/u", $nom)) {
+        $errors[] = "Le nom du produit contient des caractères non autorisés.";
+    }
+
+    // au moins 3 lettres
+    preg_match_all('/[a-zA-ZÀ-ÿ]/u', $nom, $matches);
+    if ($nom !== '' && count($matches[0]) < 3) {
+        $errors[] = "Le nom du produit doit contenir au moins 3 lettres.";
+    }
+
+    // pas uniquement des chiffres / symboles / espaces
+    if ($nom !== '' && !preg_match('/[a-zA-ZÀ-ÿ]/u', $nom)) {
+        $errors[] = "Le nom du produit ne peut pas être composé uniquement de chiffres ou de symboles.";
+    }
+
+    // ===== PRIX =====
+    if ($prix === '') {
+        $errors[] = "Le prix est obligatoire.";
+    } elseif (!is_numeric($prix)) {
+        $errors[] = "Le prix doit être un nombre valide.";
+    } else {
+        if ((float)$prix <= 0) {
+            $errors[] = "Le prix doit être supérieur à 0.";
+        }
+
+        if ((float)$prix > 1000) {
+            $errors[] = "Le prix est trop élevé, le maximum est 1000 DT.";
         }
     }
 
-    if (empty($error)) {
-        if (empty($nom)) {
-            $error = "Le nom du produit est obligatoire.";
-        } elseif (strlen($nom) < 2) {
-            $error = "Le nom du produit doit contenir au moins 2 caractères.";
-        } elseif (empty($prix)) {
-            $error = "Le prix est obligatoire.";
-        } elseif (!is_numeric($prix) || $prix <= 0) {
-            $error = "Le prix doit être un nombre positif.";
-        } elseif (!empty($calories) && (!ctype_digit($calories) || (int)$calories < 0)) {
-            $error = "Les calories doivent être un entier positif ou zéro.";
-        } elseif (empty($id_categorie)) {
-            $error = "La catégorie est obligatoire.";
+    // ===== CALORIES =====
+    if ($calories !== '' && (!ctype_digit($calories) || (int)$calories < 0)) {
+        $errors[] = "Les calories doivent être un entier positif ou zéro.";
+    }
+
+    // ===== CATÉGORIE =====
+    if ($id_categorie === '') {
+        $errors[] = "La catégorie est obligatoire.";
+    }
+
+    // ===== IMAGE OPTIONNELLE EN MODIFICATION =====
+    if (isset($_FILES['image']) && $_FILES['image']['error'] !== 4) {
+        if ($_FILES['image']['error'] === 0) {
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $originalName = $_FILES['image']['name'];
+            $tmpName = $_FILES['image']['tmp_name'];
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+            if (!in_array($extension, $allowedExtensions)) {
+                $errors[] = "Format d'image non autorisé. Utilise jpg, jpeg, png, gif ou webp.";
+            } else {
+                $newFileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+                $uploadDir = __DIR__ . '/../../uploads/';
+
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $uploadPath = $uploadDir . $newFileName;
+
+                if (move_uploaded_file($tmpName, $uploadPath)) {
+                    $image = $newFileName;
+                } else {
+                    $errors[] = "Erreur lors de l'upload de l'image.";
+                }
+            }
         } else {
-            $produit = new Produit(
-                $nom,
-                (float)$prix,
-                $image,
-                $allergene,
-                $benefices,
-                $calories !== '' ? (int)$calories : null,
-                $date_ajout,
-                $id_utilisateur,
-                (int)$id_categorie
-            );
-
-            $produitController->updateProduit($produit, $id);
-
-            header('Location: List-Produit.php');
-            exit;
+            $errors[] = "Erreur lors du téléchargement de l'image.";
         }
+    }
+
+    if (!empty($errors)) {
+        $error = implode(" ",$errors);
+    } else {
+        $produit = new Produit(
+            $nom,
+            (float)$prix,
+            $image,
+            $allergene,
+            $benefices,
+            $calories !== '' ? (int)$calories : null,
+            $date_ajout,
+            $id_utilisateur,
+            (int)$id_categorie
+        );
+
+        $produitController->updateProduit($produit, $id);
+
+        header('Location: List-Produit.php');
+        exit;
     }
 }
 ?>
@@ -201,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="card-body">
                     <?php if (!empty($error)) { ?>
                         <div class="alert alert-danger">
-                            <?php echo htmlspecialchars($error); ?>
+                            <?php echo $error; ?>
                         </div>
                     <?php } ?>
 
@@ -237,13 +284,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 name="image"
                                 accept="image/*"
                             >
-                            <?php if (!empty($produitData['image'])) { ?>
+
+                            <?php if (!empty($image)) { ?>
                                 <small class="text-muted d-block mt-2">
-                                    Image actuelle : <?php echo htmlspecialchars($produitData['image']); ?>
+                                    Image actuelle :
                                 </small>
                                 <img
-                                    src="/uploads/<?php echo htmlspecialchars($produitData['image']); ?>"
-                                    alt="Image actuelle"
+                                    src="/uploads/<?php echo htmlspecialchars($image); ?>"
+                                    alt="Image du produit"
                                     style="max-width: 120px; margin-top: 10px; border-radius: 10px;"
                                 >
                             <?php } ?>

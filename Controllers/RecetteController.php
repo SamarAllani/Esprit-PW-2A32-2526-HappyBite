@@ -6,8 +6,8 @@ class RecetteController
 {
     public function addRecette(Recette $recette)
     {
-        $sql = "INSERT INTO recette (nom, description, calories) 
-                VALUES (:nom, :description, :calories)";
+        $sql = "INSERT INTO recette (nom, description, calories, image, mise_en_avant) 
+                VALUES (:nom, :description, :calories, :image, :mise_en_avant)";
 
         $db = Config::getConnexion();
 
@@ -16,7 +16,9 @@ class RecetteController
             $query->execute([
                 'nom' => $recette->getNom(),
                 'description' => $recette->getDescription(),
-                'calories' => $recette->getCalories()
+                'calories' => $recette->getCalories(),
+                'image' => $recette->getImage(),
+                'mise_en_avant' => $recette->getMiseEnAvant()
             ]);
 
             return $db->lastInsertId();
@@ -34,7 +36,7 @@ class RecetteController
         try {
             $query = $db->prepare($sql);
             $query->execute();
-            return $query->fetchAll();
+            return $query->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             echo 'Erreur : ' . $e->getMessage();
             return [];
@@ -52,15 +54,17 @@ class RecetteController
                 'id' => $id
             ]);
 
-            $data = $query->fetch();
+            $data = $query->fetch(PDO::FETCH_ASSOC);
 
             if ($data) {
                 $recette = new Recette(
                     $data['nom'],
                     $data['description'],
-                    isset($data['calories']) ? (int)$data['calories'] : 0
+                    isset($data['calories']) ? (int)$data['calories'] : 0,
+                    $data['image'] ?? null
                 );
                 $recette->setIdRecette((int)$data['id_recette']);
+                $recette->setMiseEnAvant((int)($data['mise_en_avant'] ?? 0));
                 return $recette;
             }
 
@@ -71,12 +75,30 @@ class RecetteController
         }
     }
 
+    public function getRecetteById($id)
+    {
+        $sql = "SELECT * FROM recette WHERE id_recette = :id";
+        $db = Config::getConnexion();
+
+        try {
+            $query = $db->prepare($sql);
+            $query->bindValue(':id', $id, PDO::PARAM_INT);
+            $query->execute();
+            return $query->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            echo 'Erreur : ' . $e->getMessage();
+            return false;
+        }
+    }
+
     public function updateRecette(Recette $recette, $id)
     {
         $sql = "UPDATE recette
                 SET nom = :nom,
                     description = :description,
-                    calories = :calories
+                    calories = :calories,
+                    image = :image,
+                    mise_en_avant = :mise_en_avant
                 WHERE id_recette = :id";
 
         $db = Config::getConnexion();
@@ -87,6 +109,8 @@ class RecetteController
                 'nom' => $recette->getNom(),
                 'description' => $recette->getDescription(),
                 'calories' => $recette->getCalories(),
+                'image' => $recette->getImage(),
+                'mise_en_avant' => $recette->getMiseEnAvant(),
                 'id' => $id
             ]);
             return true;
@@ -124,29 +148,30 @@ class RecetteController
                 'motCle' => $motCle
             ]);
 
-            return $query->fetchAll();
+            return $query->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             echo 'Erreur : ' . $e->getMessage();
             return [];
         }
     }
+
     public function showRecetteDetails($id)
-{
-    $sql = "SELECT * FROM recette WHERE id_recette = :id";
-    $db = Config::getConnexion();
+    {
+        $sql = "SELECT * FROM recette WHERE id_recette = :id";
+        $db = Config::getConnexion();
 
-    try {
-        $query = $db->prepare($sql);
-        $query->execute([
-            'id' => $id
-        ]);
+        try {
+            $query = $db->prepare($sql);
+            $query->execute([
+                'id' => $id
+            ]);
 
-        return $query->fetch();
-    } catch (Exception $e) {
-        echo 'Erreur : ' . $e->getMessage();
-        return false;
+            return $query->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            echo 'Erreur : ' . $e->getMessage();
+            return false;
+        }
     }
-}
 
     public function ajouterProduitsRecette($idRecette, $produits)
     {
@@ -201,7 +226,7 @@ class RecetteController
                 'id_recette' => $idRecette
             ]);
 
-            return $query->fetchAll();
+            return $query->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             echo 'Erreur : ' . $e->getMessage();
             return [];
@@ -221,7 +246,7 @@ class RecetteController
         try {
             $query = $db->prepare($sql);
             $query->execute($produitsIds);
-            $result = $query->fetch();
+            $result = $query->fetch(PDO::FETCH_ASSOC);
 
             return (int)($result['total_calories'] ?? 0);
         } catch (Exception $e) {
@@ -230,76 +255,167 @@ class RecetteController
         }
     }
 
-   public function rechercherRecettesIntelligentes($motCle = "", $allergie = "", $objectif = "", $budget = "")
-{
-    $sql = "SELECT DISTINCT r.*
-            FROM recette r
-            LEFT JOIN recette_produit rp ON r.id_recette = rp.id_recette
-            LEFT JOIN produit p ON rp.id_produit = p.id_produit
-            WHERE 1=1";
+    private function getProfilSanteByUtilisateur($idUtilisateur)
+    {
+        $sql = "SELECT * FROM profil_sante WHERE id_utilisateur = :id_utilisateur LIMIT 1";
+        $db = Config::getConnexion();
 
-    if (!empty($motCle)) {
-        $sql .= " AND r.nom LIKE :motCle";
-    }
-
-    // Exclure les recettes contenant un produit avec allergène sensible
-    if (!empty($allergie)) {
-        $sql .= " AND (
-                    p.allergene IS NULL 
-                    OR p.allergene = '' 
-                    OR p.allergene NOT LIKE :allergie
-                  )";
-    }
-
-    // Budget : somme approximative des produits d'une recette
-    if (!empty($budget) && is_numeric($budget)) {
-        $sql .= " AND r.id_recette IN (
-                    SELECT rp2.id_recette
-                    FROM recette_produit rp2
-                    INNER JOIN produit p2 ON rp2.id_produit = p2.id_produit
-                    GROUP BY rp2.id_recette
-                    HAVING SUM(p2.prix) <= :budget
-                  )";
-    }
-
-    // Objectif selon calories recette
-    if (!empty($objectif)) {
-        if ($objectif === 'perte de poids') {
-            $sql .= " AND r.calories <= 350";
-        } elseif ($objectif === 'maintien') {
-            $sql .= " AND r.calories BETWEEN 351 AND 650";
-        } elseif ($objectif === 'gain de poids') {
-            $sql .= " AND r.calories > 650";
+        try {
+            $query = $db->prepare($sql);
+            $query->execute([
+                'id_utilisateur' => $idUtilisateur
+            ]);
+            return $query->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            echo 'Erreur profil santé : ' . $e->getMessage();
+            return null;
         }
     }
 
-    $sql .= " ORDER BY r.calories ASC, r.id_recette DESC";
-
-    $db = Config::getConnexion();
-
-    try {
-        $query = $db->prepare($sql);
-
-        if (!empty($motCle)) {
-            $motCle = "%" . $motCle . "%";
-            $query->bindParam(':motCle', $motCle);
+    private function convertirTexteEnTableau($texte)
+    {
+        if (empty($texte)) {
+            return [];
         }
 
-        if (!empty($allergie)) {
-            $allergie = "%" . $allergie . "%";
-            $query->bindParam(':allergie', $allergie);
-        }
+        $elements = preg_split('/[,;]+/', $texte);
+        $elements = array_map('trim', $elements);
+        $elements = array_filter($elements, function ($val) {
+            return $val !== '';
+        });
 
-        if (!empty($budget) && is_numeric($budget)) {
-            $query->bindParam(':budget', $budget);
-        }
-
-        $query->execute();
-        return $query->fetchAll();
-    } catch (Exception $e) {
-        echo 'Erreur : ' . $e->getMessage();
-        return [];
+        return array_values(array_unique($elements));
     }
-} 
+
+    public function rechercherRecettesIntelligentes($idUtilisateur, $motCle = "")
+    {
+        $db = Config::getConnexion();
+
+        try {
+            $profil = $this->getProfilSanteByUtilisateur($idUtilisateur);
+
+            $allergenesProfil = [];
+            $maladiesProfil = [];
+            $carencesProfil = [];
+            $objectif = "";
+
+            if ($profil) {
+                $allergenesProfil = $this->convertirTexteEnTableau($profil['allergenes'] ?? '');
+                $maladiesProfil = $this->convertirTexteEnTableau($profil['maladies'] ?? '');
+                $carencesProfil = $this->convertirTexteEnTableau($profil['carences'] ?? '');
+                $objectif = trim($profil['objectif'] ?? '');
+            }
+
+            $scoreCarencesSql = "0";
+            $params = [];
+
+            if (!empty($carencesProfil)) {
+                $scoreParts = [];
+
+                foreach ($carencesProfil as $index => $carence) {
+                    $paramName = "carence" . $index;
+                    $scoreParts[] = "(CASE WHEN p.benefices LIKE :$paramName THEN 1 ELSE 0 END)";
+                    $params[$paramName] = "%" . $carence . "%";
+                }
+
+                $scoreCarencesSql = implode(" + ", $scoreParts);
+            }
+
+            $sql = "SELECT DISTINCT 
+                        r.*,
+                        ($scoreCarencesSql) AS score_carences
+                    FROM recette r
+                    LEFT JOIN recette_produit rp ON r.id_recette = rp.id_recette
+                    LEFT JOIN produit p ON rp.id_produit = p.id_produit
+                    WHERE 1=1";
+
+            if (!empty($motCle)) {
+                $sql .= " AND r.nom LIKE :motCle";
+                $params['motCle'] = "%" . $motCle . "%";
+            }
+
+            $interdits = $allergenesProfil;
+
+            foreach ($maladiesProfil as $maladie) {
+                $maladieNormalisee = strtolower(trim($maladie));
+
+                if ($maladieNormalisee === 'diabete' || $maladieNormalisee === 'diabète') {
+                    $interdits[] = 'Sucre élevé';
+                }
+
+                if ($maladieNormalisee === 'hypertension') {
+                    $interdits[] = 'Sel élevé';
+                }
+            }
+
+            $interdits = array_unique($interdits);
+
+            foreach ($interdits as $index => $interdit) {
+                $paramName = "interdit" . $index;
+                $sql .= " AND (
+                            p.allergene IS NULL
+                            OR p.allergene = ''
+                            OR p.allergene NOT LIKE :$paramName
+                          )";
+                $params[$paramName] = "%" . $interdit . "%";
+            }
+
+            $calorieMin = null;
+            $calorieMax = null;
+
+            $objectifNormalise = strtolower(trim($objectif));
+
+            if ($objectifNormalise === 'perte de poids') {
+                $calorieMax = 300;
+            } elseif ($objectifNormalise === 'maintien') {
+                $calorieMin = 300;
+                $calorieMax = 500;
+            } elseif ($objectifNormalise === 'gain de poids') {
+                $calorieMin = 501;
+            }
+
+            foreach ($maladiesProfil as $maladie) {
+                $maladieNormalisee = strtolower(trim($maladie));
+
+                if ($maladieNormalisee === 'cholesterol' || $maladieNormalisee === 'cholestérol') {
+                    if ($calorieMax === null || $calorieMax > 350) {
+                        $calorieMax = 350;
+                    }
+                }
+            }
+
+            if ($calorieMin !== null) {
+                $sql .= " AND r.calories >= :calorieMin";
+                $params['calorieMin'] = $calorieMin;
+            }
+
+            if ($calorieMax !== null) {
+                $sql .= " AND r.calories <= :calorieMax";
+                $params['calorieMax'] = $calorieMax;
+            }
+
+            $sql .= " ORDER BY score_carences DESC, r.calories ASC, r.id_recette DESC";
+
+            $query = $db->prepare($sql);
+            $query->execute($params);
+
+            return $query->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            echo 'Erreur : ' . $e->getMessage();
+            return [];
+        }
+    }
+
+    public function setRecetteMiseEnAvant($idRecette, $valeur = 1)
+    {
+        $sql = "UPDATE recette SET mise_en_avant = :mise_en_avant WHERE id_recette = :id_recette";
+        $db = Config::getConnexion();
+        $stmt = $db->prepare($sql);
+
+        return $stmt->execute([
+            'mise_en_avant' => $valeur,
+            'id_recette' => $idRecette
+        ]);
+    }
 }
 ?>

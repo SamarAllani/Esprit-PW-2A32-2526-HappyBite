@@ -3,15 +3,23 @@ include '../../Controllers/ProduitController.php';
 
 $produitController = new ProduitController();
 
+$idFournisseur = 2; // temporaire
+
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     die("ID du produit manquant.");
 }
 
-$id = intval($_GET['id']);
-$produit = $produitController->showProduitDetails($id);
+$idProduit = (int) $_GET['id'];
+
+// si tu as ajouté cette méthode dans ProduitController, utilise-la
+if (method_exists($produitController, 'getProduitDetailsByIdAndUtilisateur')) {
+    $produit = $produitController->getProduitDetailsByIdAndUtilisateur($idProduit, $idFournisseur);
+} else {
+    $produit = $produitController->getProduitByIdAndUtilisateur($idProduit, $idFournisseur);
+}
 
 if (!$produit) {
-    die("Produit introuvable.");
+    die("Produit introuvable ou accès refusé.");
 }
 
 $allergenes = array_filter(array_map('trim', explode(',', $produit['allergene'] ?? '')));
@@ -22,35 +30,13 @@ $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Détail Produit</title>
+    <title>Détail du produit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" type="text/css" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="/Views/assets/css/style.css">
 </head>
 <body>
-
-<nav class="main-navbar">
-    <div class="nav-container">
-        <a href="index.php" class="nav-logo">
-            <img src="../assets/images/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>
-        <ul class="nav-links">
-            <li><a href="index.php">Accueil</a></li>
-            <li><a href="List-Produit.php" class="active">Produits</a></li>
-            <li><a href="#">Recettes</a></li>
-            <li><a href="#">Communauté</a></li>
-        </ul>
-
-        <div class="nav-user">
-            <a href="#" class="nav-action">Frigo</a>
-            <a href="#" class="nav-action">Commandes</a>
-            <a href="#" class="nav-action">Santé</a>
-            <a href="#" class="nav-profile">Profil</a>
-        </div>
-    </div>
-</nav>
 
 <div class="container py-5">
     <div class="row justify-content-center">
@@ -64,19 +50,18 @@ $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?
                     <div class="mb-4">
                         <h2 class="fw-bold mb-2"><?php echo htmlspecialchars($produit['nom']); ?></h2>
 
-                        <div class="d-flex flex-wrap gap-2">
-                            <span class="badge bg-light text-dark fs-6">
-                                <?php echo htmlspecialchars($produit['nom_categorie']); ?>
-                            </span>
-
-                            <span class="badge bg-secondary fs-6">
-                                Fournisseur : <?php echo htmlspecialchars($produit['nom_fournisseur'] ?? 'Non renseigné'); ?>
-                            </span>
-                        </div>
+                        <span class="badge bg-light text-dark fs-6">
+                            <?php
+                                echo htmlspecialchars(
+                                    $produit['nom_categorie'] ?? ('Catégorie #' . $produit['id_categorie'])
+                                );
+                            ?>
+                        </span>
                     </div>
 
                     <div class="mb-4 text-center">
                         <h5 class="fw-bold mb-3">Image du produit</h5>
+
                         <?php if (!empty($produit['image'])) { ?>
                             <img
                                 src="/uploads/<?php echo htmlspecialchars($produit['image']); ?>"
@@ -112,7 +97,9 @@ $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?
                         <h5 class="fw-bold">Allergènes / composants sensibles</h5>
                         <?php if (!empty($allergenes)) { ?>
                             <?php foreach ($allergenes as $item) { ?>
-                                <span class="badge bg-danger me-1 mb-1"><?php echo htmlspecialchars($item); ?></span>
+                                <span class="badge bg-danger me-1 mb-1">
+                                    <?php echo htmlspecialchars($item); ?>
+                                </span>
                             <?php } ?>
                         <?php } else { ?>
                             <p class="text-muted mb-0">Aucun allergène précisé.</p>
@@ -123,7 +110,9 @@ $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?
                         <h5 class="fw-bold">Bénéfices</h5>
                         <?php if (!empty($benefices)) { ?>
                             <?php foreach ($benefices as $item) { ?>
-                                <span class="badge bg-success me-1 mb-1"><?php echo htmlspecialchars($item); ?></span>
+                                <span class="badge bg-success me-1 mb-1">
+                                    <?php echo htmlspecialchars($item); ?>
+                                </span>
                             <?php } ?>
                         <?php } else { ?>
                             <p class="text-muted mb-0">Aucun bénéfice précisé.</p>
@@ -139,8 +128,13 @@ $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="List-Produit.php" class="btn btn-secondary rounded-pill">Retour à la liste</a>
-                        <a href="#" class="btn btn-success rounded-pill">Ajouter au frigo</a>
+                        <a href="List-Produit-Fournisseur.php" class="btn btn-secondary rounded-pill">
+                            Retour à la liste
+                        </a>
+
+                        <a href="Edit-Produit-Fournisseur.php?id=<?php echo $produit['id_produit']; ?>" class="btn btn-success rounded-pill">
+                            Modifier
+                        </a>
                     </div>
                 </div>
             </div>

@@ -73,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = "La description ne doit pas dépasser 255 caractères.";
     }
 
+    if (strlen($description) < 20) {
+        $errors[] = "La description  doit  dépasser 20 caractères.";
+    }
+
     // Vérification doublon
     if ($nom !== '') {
         $categories = $categorieController->listCategories();
@@ -86,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!empty($errors)) {
-        $error = implode("<br>", $errors);
+        $error = implode(" ",$errors);
     } else {
         $categorie = new Categorie($nom, $description);
         $categorieController->addCategorie($categorie);

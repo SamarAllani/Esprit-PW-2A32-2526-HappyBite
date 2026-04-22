@@ -24,7 +24,7 @@ class Config
             $servername = "localhost";
             $username = "root";
             $password = "";
-            $dbname = "projetWeb";
+            $dbname = "projetWeb2";
             try {
                 // On crée une nouvelle connexion PDO et on la stocke dans $pdo.
                 self::$pdo = new PDO(

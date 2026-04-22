@@ -1,51 +1,9 @@
-<div class="admin-layout">
-    <aside class="admin-sidebar">
-        <div class="admin-sidebar-header">
-        <a href="#" class="admin-logo">
-            <img src="../assets/images/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>
-        </div>
-
-        <nav class="admin-main-menu">
-            <a href="#" class="admin-main-link active">Produit</a>
-            <a href="#" class="admin-main-link">Communauté</a>
-            <a href="#" class="admin-main-link">Post</a>
-            <a href="#" class="admin-main-link">Utilisateur</a>
-            <a href="#" class="admin-main-link">Santé</a>
-        </nav>
-    </aside>
-
-    <main class="admin-content">
-        <!-- sous-nav produit ici -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarBack">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarBack">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Produit.php">Produits</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="List-Categorie.php">Catégories</a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
 <?php
 include '../../Controllers/RecetteController.php';
 include '../../Controllers/ProduitController.php';
 require_once __DIR__ . '/../../Models/Recette.php';
 
-$error = "";
+$error = [];
 
 $recetteController = new RecetteController();
 $produitController = new ProduitController();
@@ -56,19 +14,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom = trim($_POST['nom'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $produitsSelectionnes = $_POST['produits'] ?? [];
+    $image = "";
 
-    if (empty($nom)) {
-        $error = "Le nom de la recette est obligatoire.";
-    } elseif (strlen($nom) < 2) {
-        $error = "Le nom de la recette doit contenir au moins 2 caractères.";
-    } elseif (empty($description)) {
-        $error = "La description est obligatoire.";
-    } elseif (empty($produitsSelectionnes)) {
-        $error = "Veuillez sélectionner au moins un produit.";
+    $errors = [];
+
+    if ($nom === '') {
+        $errors[] = "Le nom de la recette est obligatoire.";
+    }
+
+    if (mb_strlen($nom) < 2) {
+        $errors[] = "Le nom de la recette doit contenir au moins 2 caractères.";
+    }
+
+    if ($nom !== '' && !preg_match("/^[a-zA-ZÀ-ÿ0-9\s%\-\'()]+$/u", $nom)) {
+        $errors[] = "Le nom de la recette contient des caractères non autorisés.";
+    }
+
+    preg_match_all('/[a-zA-ZÀ-ÿ]/u', $nom, $matches);
+    if ($nom !== '' && count($matches[0]) < 3) {
+        $errors[] = "Le nom de la recette doit contenir au moins 3 lettres.";
+    }
+
+    if ($nom !== '' && !preg_match('/[a-zA-ZÀ-ÿ]/u', $nom)) {
+        $errors[] = "Le nom de la recette ne peut pas être composé uniquement de chiffres ou de symboles.";
+    }
+
+    if ($description === '') {
+        $errors[] = "La description est obligatoire.";
+    }
+
+    if ($description !== '' && mb_strlen($description) < 10) {
+        $errors[] = "La description doit contenir au moins 10 caractères.";
+    }
+
+    if (empty($produitsSelectionnes)) {
+        $errors[] = "Veuillez sélectionner au moins un produit.";
+    }
+
+    if (!isset($_FILES['image']) || $_FILES['image']['error'] === 4) {
+        $errors[] = "L'image de la recette est obligatoire.";
     } else {
+        if ($_FILES['image']['error'] === 0) {
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $originalName = $_FILES['image']['name'];
+            $tmpName = $_FILES['image']['tmp_name'];
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+            if (!in_array($extension, $allowedExtensions)) {
+                $errors[] = "Format d'image non autorisé. Utilise jpg, jpeg, png, gif ou webp.";
+            } else {
+                $newFileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+                $uploadDir = __DIR__ . '/../../uploads/';
+
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $uploadPath = $uploadDir . $newFileName;
+
+                if (move_uploaded_file($tmpName, $uploadPath)) {
+                    $image = $newFileName;
+                } else {
+                    $errors[] = "Erreur lors de l'upload de l'image.";
+                }
+            }
+        } else {
+            $errors[] = "Erreur lors du téléchargement de l'image.";
+        }
+    }
+
+    if (empty($errors)) {
         $calories = $recetteController->calculerCaloriesRecette($produitsSelectionnes);
 
-        $recette = new Recette($nom, $description, $calories);
+        $recette = new Recette($nom, $description, $calories, $image);
         $idRecette = $recetteController->addRecette($recette);
 
         if ($idRecette) {
@@ -76,9 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: List-Recette.php');
             exit;
         } else {
-            $error = "Erreur lors de l'ajout de la recette.";
+            $errors[] = "Erreur lors de l'ajout de la recette.";
         }
     }
+
+    $error = $errors;
 }
 ?>
 
@@ -90,6 +110,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="/Views/assets/css/style.css">
+
+    <style>
+        .image-preview {
+            max-width: 140px;
+            max-height: 140px;
+            border-radius: 12px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            object-fit: cover;
+            display: none;
+        }
+    </style>
 </head>
 <body>
 
@@ -103,19 +135,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="card-body p-4">
                     <?php if (!empty($error)) { ?>
-                        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                <?php foreach ($error as $err) { ?>
+                                    <li><?php echo htmlspecialchars($err); ?></li>
+                                <?php } ?>
+                            </ul>
+                        </div>
                     <?php } ?>
 
-                    <form method="POST" action="">
+                    <form method="POST" action="" enctype="multipart/form-data">
                         <div class="mb-4">
                             <label for="nom" class="form-label fw-semibold">Nom de la recette</label>
-                            <input type="text" class="form-control" id="nom" name="nom"
-                                value="<?php echo isset($_POST['nom']) ? htmlspecialchars($_POST['nom']) : ''; ?>">
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="nom"
+                                name="nom"
+                                value="<?php echo isset($_POST['nom']) ? htmlspecialchars($_POST['nom']) : ''; ?>"
+                            >
                         </div>
 
                         <div class="mb-4">
                             <label for="description" class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" id="description" name="description" rows="4"><?php echo isset($_POST['description']) ? htmlspecialchars($_POST['description']) : ''; ?></textarea>
+                            <textarea
+                                class="form-control"
+                                id="description"
+                                name="description"
+                                rows="4"
+                            ><?php echo isset($_POST['description']) ? htmlspecialchars($_POST['description']) : ''; ?></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="image" class="form-label fw-semibold">Image</label>
+                            <input
+                                type="file"
+                                class="form-control"
+                                id="image"
+                                name="image"
+                                accept="image/*"
+                            >
+                            <small class="text-muted d-block mt-2">
+                                En cas d'erreur de validation, veuillez re-sélectionner l'image.
+                            </small>
+                            <img id="imagePreview" class="image-preview" alt="Aperçu image">
                         </div>
 
                         <div class="mb-4">
@@ -158,5 +221,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById('image').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('imagePreview');
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.src = '';
+        preview.style.display = 'none';
+    }
+});
+</script>
 </body>
 </html>

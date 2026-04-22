@@ -5,6 +5,7 @@ class Produit
     private ?int $id_produit = null;
     private ?string $nom = null;
     private ?float $prix = null;
+    private ?float $promo = null;
     private ?string $image = null;
     private ?string $allergene = null;
     private ?string $benefices = null;
@@ -63,6 +64,16 @@ class Produit
     public function setPrix(float $prix): void
     {
         $this->prix = $prix;
+    }
+
+    public function getPromo(): ?float
+    {
+        return $this->promo;
+    }
+
+    public function setPromo(?float $promo): void
+    {
+        $this->promo = $promo;
     }
 
     public function getImage(): ?string
