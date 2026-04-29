@@ -133,6 +133,18 @@ require __DIR__ . '/includes/nav_front.php';
 
 <div id="panier-toast" class="panier-toast" role="status" aria-live="polite" hidden></div>
 
+<style>
+    .panier-toast {
+        background: #fb8c00;
+        border-color: #fb8c00;
+        color: #fff;
+    }
+    .panier-toast.panier-toast--visible {
+        background: #ef6c00;
+        border-color: #ef6c00;
+    }
+</style>
+
 <footer>
     © 2026 HappyBite
 </footer>

@@ -821,6 +821,7 @@
 
         .bo-table-scroll {
             overflow: auto;
+            max-height: 500px;
         }
 
         .bo-table {

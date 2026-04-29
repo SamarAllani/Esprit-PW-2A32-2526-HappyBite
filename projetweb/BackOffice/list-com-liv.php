@@ -17,6 +17,18 @@ $filtreCommandeId = trim((string) ($_GET['commande_id'] ?? ''));
 $filtreCommandeDate = trim((string) ($_GET['commande_date'] ?? ''));
 $filtreLivraisonId = trim((string) ($_GET['livraison_id'] ?? ''));
 $filtreLivraisonDate = trim((string) ($_GET['livraison_date'] ?? ''));
+$sortBy = trim((string) ($_GET['sort_by'] ?? 'aucun'));
+$sortOrder = trim((string) ($_GET['sort_order'] ?? 'desc'));
+if (!in_array($sortBy, ['aucun', 'date', 'total', 'mode_paiement'], true)) {
+    $sortBy = 'aucun';
+}
+if (!in_array($sortOrder, ['asc', 'desc'], true)) {
+    $sortOrder = 'desc';
+}
+$mode = trim((string) ($_GET['mode'] ?? $vue));
+if (!in_array($mode, ['commande', 'livraison', 'dashboard'], true)) {
+    $mode = $vue;
+}
 
 if (isset($_GET['supprimer_livraison'])) {
     $idSuppr = (int) $_GET['supprimer_livraison'];
@@ -120,6 +132,30 @@ if ($filtreCommandeId !== '' || $filtreCommandeDate !== '') {
         }
         return true;
     }));
+}
+
+if ($sortBy !== 'aucun') {
+    usort($commandes, static function (array $a, array $b) use ($sortBy, $sortOrder, $normalizeYmd): int {
+        $left = '';
+        $right = '';
+        if ($sortBy === 'date') {
+            $left = $normalizeYmd((string) ($a['date'] ?? $a['date_commande'] ?? ''));
+            $right = $normalizeYmd((string) ($b['date'] ?? $b['date_commande'] ?? ''));
+        } elseif ($sortBy === 'total') {
+            $left = (string) ((float) ($a['total'] ?? 0));
+            $right = (string) ((float) ($b['total'] ?? 0));
+        } elseif ($sortBy === 'mode_paiement') {
+            $left = strtolower(trim((string) ($a['modePaiement'] ?? '')));
+            $right = strtolower(trim((string) ($b['modePaiement'] ?? '')));
+        }
+
+        if ($sortBy === 'total') {
+            $cmp = ((float) $left) <=> ((float) $right);
+        } else {
+            $cmp = $left <=> $right;
+        }
+        return $sortOrder === 'asc' ? $cmp : -$cmp;
+    });
 }
 
 if ($filtreLivraisonId !== '' || $filtreLivraisonDate !== '') {
@@ -255,6 +291,7 @@ if ($commandeEdition !== null) {
 
 $imgModify = is_file(__DIR__ . '/images/modify.png') ? 'images/modify.png' : 'images/modify.svg';
 $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'images/delete.svg';
+$imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -273,6 +310,71 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
 
 <main class="commande-wrap">
     <div class="liste-com-liv-stack" style="max-width: 1100px; width: 100%;">
+        <style>
+            .liste-com-liv-topbar {
+                display: flex;
+                justify-content: flex-end;
+                margin-bottom: 14px;
+            }
+            .liste-com-liv-topbar .btn-vue-toggle {
+                border-radius: 999px;
+                padding: 10px 18px;
+            }
+            .liste-com-liv-title-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+                flex-wrap: wrap;
+            }
+            .liste-com-liv-title-actions {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .liste-com-liv-dashboard-title {
+                margin: 18px 0 10px;
+                font-size: 2.2rem;
+                font-weight: 700;
+                color: #1f3a28;
+            }
+            .liste-com-liv-subtitle {
+                margin: 8px 0 10px;
+                font-size: 1.05rem;
+                font-weight: 600;
+                color: #2f3d36;
+            }
+            .page-list-com-liv .bo-dashboard {
+                max-height: none;
+                overflow: visible;
+            }
+            .liste-com-liv-dash-section {
+                margin-bottom: 18px;
+            }
+            .liste-com-liv-sort-row {
+                display: flex;
+                align-items: end;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            .page-list-com-liv .bo-form-row {
+                grid-template-columns: 1fr 1fr auto auto;
+            }
+            .bo-sort-swap {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                width: 24px;
+                height: 24px;
+            }
+            img.bo-sort-swap {
+                width: 24px;
+                height: 24px;
+                object-fit: contain;
+                display: block;
+            }
+        </style>
 
         <?php if ($commandeEdition !== null) { ?>
             <section class="commande-panel liste-com-liv-form-panel" aria-label="Modifier une commande">
@@ -374,97 +476,152 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
             </section>
         <?php } ?>
 
-        <h1 class="liste-com-liv-title">Liste de commande et livraison</h1>
-
-        <div class="mode-buttons">
-            <button type="button" id="btn-vue-commande" class="btn-commande-primary btn-vue-toggle<?php echo $vue === 'commande' ? ' is-active' : ''; ?>" data-vue="commande">Commande</button>
-            <button type="button" id="btn-vue-livraison" class="btn-commande-outline btn-vue-toggle<?php echo $vue === 'livraison' ? ' is-active' : ''; ?>" data-vue="livraison">Livraison</button>
+        <div class="liste-com-liv-topbar">
+            <div class="mode-buttons">
+                <button type="button" id="btn-vue-commande" class="<?php echo $mode === 'commande' ? 'btn-commande-primary is-active' : 'btn-commande-outline'; ?> btn-vue-toggle" data-vue="commande">Commande</button>
+                <button type="button" id="btn-vue-livraison" class="<?php echo $mode === 'livraison' ? 'btn-commande-primary is-active' : 'btn-commande-outline'; ?> btn-vue-toggle" data-vue="livraison">Livraison</button>
+                <button type="button" id="btn-vue-dashboard" class="<?php echo $mode === 'dashboard' ? 'btn-commande-primary is-active' : 'btn-commande-outline'; ?> btn-vue-toggle" data-vue="dashboard">Dashboard</button>
+            </div>
         </div>
 
-        <section id="dashboard-commande" class="bo-dashboard"<?php echo $vue !== 'commande' ? ' hidden' : ''; ?>>
-            <div class="bo-stats-grid">
-                <article class="bo-stat-card"><h3>Total commandes</h3><p><?php echo $commandeTotal; ?></p></article>
-                <article class="bo-stat-card"><h3>Chiffre d'affaires</h3><p><?php echo htmlspecialchars(number_format($commandeRevenue, 2, ',', ' ')); ?> DT</p></article>
-                <article class="bo-stat-card"><h3>Commandes aujourd'hui</h3><p><?php echo $commandeToday; ?></p></article>
-                <article class="bo-stat-card"><h3>Commandes en attente</h3><p><?php echo $commandePending; ?></p></article>
+        <div class="liste-com-liv-title-row"<?php echo $mode === 'dashboard' ? ' hidden' : ''; ?>>
+            <h1 id="main-view-title" class="liste-com-liv-title">Liste de commande et livraison</h1>
+            <div id="liste-title-actions" class="liste-com-liv-title-actions">
+                <button type="button" id="btn-export-pdf" class="btn-commande-primary">Exporter PDF</button>
             </div>
-            <div class="bo-charts-grid">
-                <article class="bo-chart-card">
-                    <h3>Évolution des commandes</h3>
-                    <canvas id="chart-commandes-mois" height="120"></canvas>
-                </article>
-                <article class="bo-chart-card">
-                    <h3>Répartition par mode de paiement</h3>
-                    <canvas id="chart-modes-paiement" height="120"></canvas>
-                </article>
+        </div>
+
+        <section id="dashboard-global" class="bo-dashboard"<?php echo $mode !== 'dashboard' ? ' hidden' : ''; ?>>
+            <div class="liste-com-liv-dash-section liste-com-liv-dash-section--commande">
+                <h2 class="liste-com-liv-dashboard-title">Dashboard des Commande</h2>
+                <div class="bo-stats-grid">
+                    <article class="bo-stat-card"><h3>Total commandes</h3><p><?php echo $commandeTotal; ?></p></article>
+                    <article class="bo-stat-card"><h3>Chiffre d'affaires</h3><p><?php echo htmlspecialchars(number_format($commandeRevenue, 2, ',', ' ')); ?> DT</p></article>
+                    <article class="bo-stat-card"><h3>Commandes aujourd'hui</h3><p><?php echo $commandeToday; ?></p></article>
+                    <article class="bo-stat-card"><h3>Commandes en attente</h3><p><?php echo $commandePending; ?></p></article>
+                </div>
+                <h3 class="liste-com-liv-subtitle">Charts commandes</h3>
+                <div class="bo-charts-grid">
+                    <article class="bo-chart-card">
+                        <h3>Évolution des commandes - Line chart (orders per month)</h3>
+                        <canvas id="chart-commandes-mois" height="120"></canvas>
+                    </article>
+                    <article class="bo-chart-card">
+                        <h3>Répartition par mode de paiement - Pie chart (cash / card / etc.)</h3>
+                        <canvas id="chart-modes-paiement" height="120"></canvas>
+                    </article>
+                </div>
+            </div>
+            <div class="liste-com-liv-dash-section liste-com-liv-dash-section--livraison">
+                <h2 class="liste-com-liv-dashboard-title">Dashboard des livraisons</h2>
+                <h3 class="liste-com-liv-subtitle">Top stats de livraison :</h3>
+                <div class="bo-stats-grid">
+                    <article class="bo-stat-card"><h3>Total livraisons</h3><p><?php echo $livraisonTotal; ?></p></article>
+                    <article class="bo-stat-card"><h3>Livraisons en attente</h3><p><?php echo $livraisonPreparation; ?></p></article>
+                    <article class="bo-stat-card"><h3>Livraisons en cours</h3><p><?php echo $livraisonEnCours; ?></p></article>
+                    <article class="bo-stat-card"><h3>Livraisons terminées</h3><p><?php echo $livraisonTerminees; ?></p></article>
+                </div>
+                <h3 class="liste-com-liv-subtitle">Charts Statut distribution</h3>
+                <div class="bo-charts-grid">
+                    <article class="bo-chart-card">
+                        <h3>Statut distribution - Pie chart (en attente / en cours / livrée)</h3>
+                        <canvas id="chart-statut-livraison" height="120"></canvas>
+                    </article>
+                    <article class="bo-chart-card">
+                        <h3>Livraisons par jour - Line chart</h3>
+                        <canvas id="chart-livraisons-jour" height="120"></canvas>
+                    </article>
+                </div>
             </div>
         </section>
 
-        <section id="dashboard-livraison" class="bo-dashboard"<?php echo $vue !== 'livraison' ? ' hidden' : ''; ?>>
-            <div class="bo-stats-grid">
-                <article class="bo-stat-card"><h3>Total livraisons</h3><p><?php echo $livraisonTotal; ?></p></article>
-                <article class="bo-stat-card"><h3>Livraisons en préparation</h3><p><?php echo $livraisonPreparation; ?></p></article>
-                <article class="bo-stat-card"><h3>Livraisons en cours</h3><p><?php echo $livraisonEnCours; ?></p></article>
-                <article class="bo-stat-card"><h3>Livraisons terminées</h3><p><?php echo $livraisonTerminees; ?></p></article>
-            </div>
-            <div class="bo-charts-grid">
-                <article class="bo-chart-card">
-                    <h3>Statut distribution</h3>
-                    <canvas id="chart-statut-livraison" height="120"></canvas>
-                </article>
-                <article class="bo-chart-card">
-                    <h3>Livraisons par jour</h3>
-                    <canvas id="chart-livraisons-jour" height="120"></canvas>
-                </article>
-            </div>
-        </section>
-
-        <section class="bo-panel" aria-label="Recherche / filtres">
-            <?php if ($vue === 'commande') { ?>
-                <form method="get" action="list-com-liv.php">
-                    <input type="hidden" name="vue" value="commande">
-                    <div class="bo-form-row">
+        <section class="bo-panel" aria-label="Recherche / filtres"<?php echo $mode === 'dashboard' ? ' hidden' : ''; ?>>
+            <form id="filters-commande" method="get" action="list-com-liv.php"<?php echo $mode !== 'commande' ? ' hidden' : ''; ?>>
+                <input type="hidden" name="vue" value="commande">
+                <input type="hidden" name="sort_order" id="sort_order_commande" value="<?php echo htmlspecialchars($sortOrder); ?>">
+                <div class="bo-form-row">
+                    <div class="bo-field">
+                        <label for="commande_id">Rechercher commande (ID)</label>
+                        <input type="number" id="commande_id" name="commande_id" min="1" placeholder="Ex. 12" value="<?php echo htmlspecialchars($filtreCommandeId); ?>">
+                    </div>
+                    <div class="bo-field">
+                        <label for="commande_date">Filtrer commande (date)</label>
+                        <input type="date" id="commande_date" name="commande_date" value="<?php echo htmlspecialchars($filtreCommandeDate); ?>">
+                    </div>
+                    <div class="bo-field bo-field-submit">
+                        <button type="submit" class="bo-btn-primary">Filtrer</button>
+                    </div>
+                    <div class="liste-com-liv-sort-row">
                         <div class="bo-field">
-                            <label for="commande_id">Rechercher commande (ID)</label>
-                            <input type="number" id="commande_id" name="commande_id" min="1" placeholder="Ex. 12" value="<?php echo htmlspecialchars($filtreCommandeId); ?>">
-                        </div>
-                        <div class="bo-field">
-                            <label for="commande_date">Filtrer commande (date)</label>
-                            <input type="date" id="commande_date" name="commande_date" value="<?php echo htmlspecialchars($filtreCommandeDate); ?>">
+                            <label for="sort_by_commande">Trier par</label>
+                            <select id="sort_by_commande" name="sort_by">
+                                <option value="aucun"<?php echo $sortBy === 'aucun' ? ' selected' : ''; ?>>Aucun</option>
+                                <option value="date"<?php echo $sortBy === 'date' ? ' selected' : ''; ?>>Date</option>
+                                <option value="total"<?php echo $sortBy === 'total' ? ' selected' : ''; ?>>Total</option>
+                                <option value="mode_paiement"<?php echo $sortBy === 'mode_paiement' ? ' selected' : ''; ?>>Mode de paiement</option>
+                            </select>
                         </div>
                         <div class="bo-field bo-field-submit">
-                            <button type="submit" class="bo-btn-primary">Filtrer</button>
-                        </div>
-                    </div>
-                </form>
-            <?php } else { ?>
-                <form method="get" action="list-com-liv.php">
-                    <input type="hidden" name="vue" value="livraison">
-                    <div class="bo-form-row">
-                        <div class="bo-field">
-                            <label for="livraison_id">Rechercher livraison (ID)</label>
-                            <input type="number" id="livraison_id" name="livraison_id" min="1" placeholder="Ex. 4" value="<?php echo htmlspecialchars($filtreLivraisonId); ?>">
-                        </div>
-                        <div class="bo-field">
-                            <label for="livraison_date_filter">Filtrer livraison (date)</label>
-                            <input type="date" id="livraison_date_filter" name="livraison_date" value="<?php echo htmlspecialchars($filtreLivraisonDate); ?>">
+                            <button type="submit" class="bo-btn-primary">Trier</button>
                         </div>
                         <div class="bo-field bo-field-submit">
-                            <button type="submit" class="bo-btn-primary">Filtrer</button>
+                            <?php if ($imgSwap !== '') { ?>
+                                <img id="btn-order-commande" class="bo-sort-swap" src="<?php echo htmlspecialchars($imgSwap); ?>" alt="Inverser le tri" role="button" tabindex="0">
+                            <?php } else { ?>
+                                <span id="btn-order-commande" class="bo-sort-swap" role="button" tabindex="0">↕</span>
+                            <?php } ?>
                         </div>
                     </div>
-                </form>
-            <?php } ?>
+                </div>
+            </form>
+
+            <form id="filters-livraison" method="get" action="list-com-liv.php"<?php echo $mode !== 'livraison' ? ' hidden' : ''; ?>>
+                <input type="hidden" name="vue" value="livraison">
+                <input type="hidden" name="sort_order" id="sort_order_livraison" value="<?php echo htmlspecialchars($sortOrder); ?>">
+                <div class="bo-form-row">
+                    <div class="bo-field">
+                        <label for="livraison_id">Rechercher livraison (ID)</label>
+                        <input type="number" id="livraison_id" name="livraison_id" min="1" placeholder="Ex. 4" value="<?php echo htmlspecialchars($filtreLivraisonId); ?>">
+                    </div>
+                    <div class="bo-field">
+                        <label for="livraison_date_filter">Filtrer livraison (date)</label>
+                        <input type="date" id="livraison_date_filter" name="livraison_date" value="<?php echo htmlspecialchars($filtreLivraisonDate); ?>">
+                    </div>
+                    <div class="bo-field bo-field-submit">
+                        <button type="submit" class="bo-btn-primary">Filtrer</button>
+                    </div>
+                    <div class="liste-com-liv-sort-row">
+                        <div class="bo-field">
+                            <label for="sort_by_livraison">Trier par</label>
+                            <select id="sort_by_livraison" name="sort_by">
+                                <option value="aucun"<?php echo $sortBy === 'aucun' ? ' selected' : ''; ?>>Aucun</option>
+                                <option value="date"<?php echo $sortBy === 'date' ? ' selected' : ''; ?>>Date</option>
+                                <option value="total"<?php echo $sortBy === 'total' ? ' selected' : ''; ?>>Total</option>
+                                <option value="mode_paiement"<?php echo $sortBy === 'mode_paiement' ? ' selected' : ''; ?>>Mode de paiement</option>
+                            </select>
+                        </div>
+                        <div class="bo-field bo-field-submit">
+                            <button type="submit" class="bo-btn-primary">Trier</button>
+                        </div>
+                        <div class="bo-field bo-field-submit">
+                            <?php if ($imgSwap !== '') { ?>
+                                <img id="btn-order-livraison" class="bo-sort-swap" src="<?php echo htmlspecialchars($imgSwap); ?>" alt="Inverser le tri" role="button" tabindex="0">
+                            <?php } else { ?>
+                                <span id="btn-order-livraison" class="bo-sort-swap" role="button" tabindex="0">↕</span>
+                            <?php } ?>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </section>
 
-        <section class="bo-table-wrap" aria-label="Tableau">
-            <div id="wrap-table-commande" class="table-vue"<?php echo $vue !== 'commande' ? ' hidden' : ''; ?>>
+        <section class="bo-table-wrap" aria-label="Tableau"<?php echo $mode === 'dashboard' ? ' hidden' : ''; ?>>
+            <div id="wrap-table-commande" class="table-vue"<?php echo $mode !== 'commande' ? ' hidden' : ''; ?>>
                 <div class="bo-table-scroll">
                     <table class="bo-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>ID utilisateur</th>
                                 <th>Date</th>
                                 <th>Total</th>
                                 <th>Mode paiement</th>
@@ -475,13 +632,12 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
                         </thead>
                         <tbody>
                             <?php if ($commandes === []) { ?>
-                                <tr><td colspan="8" class="bo-empty">Aucune commande.</td></tr>
+                                <tr><td colspan="7" class="bo-empty">Aucune commande.</td></tr>
                             <?php } else { ?>
                                 <?php foreach ($commandes as $c) { ?>
                                     <?php $idC = (int) $c['id_commande']; ?>
                                     <tr>
                                         <td class="bo-td-center"><?php echo $idC; ?></td>
-                                        <td class="bo-td-center"><?php echo 1; ?></td>
                                         <td class="bo-td-center"><?php echo htmlspecialchars((string) ($c['date'] ?? $c['date_commande'] ?? '')); ?></td>
                                         <td class="bo-td-center"><?php echo htmlspecialchars(number_format((float) ($c['total'] ?? 0), 2, ',', ' ')); ?> DT</td>
                                         <td class="bo-td-center"><?php echo htmlspecialchars((string) ($c['modePaiement'] ?? '—')); ?></td>
@@ -505,13 +661,12 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
                 </div>
             </div>
 
-            <div id="wrap-table-livraison" class="table-vue"<?php echo $vue !== 'livraison' ? ' hidden' : ''; ?>>
+            <div id="wrap-table-livraison" class="table-vue"<?php echo $mode !== 'livraison' ? ' hidden' : ''; ?>>
                 <div class="bo-table-scroll">
                     <table class="bo-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>ID utilisateur</th>
                                 <th>Date</th>
                                 <th>Statut</th>
                                 <th>Actions</th>
@@ -519,7 +674,7 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
                         </thead>
                         <tbody>
                             <?php if ($livraisons === []) { ?>
-                                <tr><td colspan="5" class="bo-empty">Aucune livraison.</td></tr>
+                                <tr><td colspan="4" class="bo-empty">Aucune livraison.</td></tr>
                             <?php } else { ?>
                                 <?php foreach ($livraisons as $liv) { ?>
                                     <?php
@@ -545,7 +700,6 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
                                     ?>
                                     <tr>
                                         <td class="bo-td-center"><?php echo $idL; ?></td>
-                                        <td class="bo-td-center"><?php echo 1; ?></td>
                                         <td class="bo-td-center"><?php echo htmlspecialchars($dtAff); ?></td>
                                         <td class="bo-td-center">
                                             <span class="bo-statut <?php echo htmlspecialchars($statutClass); ?>">
@@ -588,101 +742,208 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script>
 (function () {
     var vueInit = <?php echo json_encode($vue); ?>;
+    var modeInit = <?php echo json_encode($mode); ?>;
     var wrapC = document.getElementById('wrap-table-commande');
     var wrapL = document.getElementById('wrap-table-livraison');
-    var dashC = document.getElementById('dashboard-commande');
-    var dashL = document.getElementById('dashboard-livraison');
+    var dashGlobal = document.getElementById('dashboard-global');
     var btnC = document.getElementById('btn-vue-commande');
     var btnL = document.getElementById('btn-vue-livraison');
-    if (!wrapC || !wrapL || !dashC || !dashL || !btnC || !btnL) return;
+    var btnD = document.getElementById('btn-vue-dashboard');
+    var titleEl = document.getElementById('main-view-title');
+    var panelFiltres = document.querySelector('.bo-panel');
+    var tableWrap = document.querySelector('.bo-table-wrap');
+    var titleRow = document.querySelector('.liste-com-liv-title-row');
+    var filtersCommande = document.getElementById('filters-commande');
+    var filtersLivraison = document.getElementById('filters-livraison');
+    var orderBtnCommande = document.getElementById('btn-order-commande');
+    var orderBtnLivraison = document.getElementById('btn-order-livraison');
+    var sortOrderCommande = document.getElementById('sort_order_commande');
+    var sortOrderLivraison = document.getElementById('sort_order_livraison');
+    var exportBtn = document.getElementById('btn-export-pdf');
+    var titleActions = document.getElementById('liste-title-actions');
+    if (!wrapC || !wrapL || !dashGlobal || !btnC || !btnL || !btnD || !panelFiltres || !tableWrap || !filtersCommande || !filtersLivraison) return;
 
     var charts = [];
     if (window.Chart) {
-        charts.push(new Chart(document.getElementById('chart-commandes-mois'), {
-            type: 'line',
-            data: {
-                labels: <?php echo json_encode(array_keys($commandesParMois)); ?>,
-                datasets: [{
-                    label: 'Commandes',
-                    data: <?php echo json_encode(array_values($commandesParMois)); ?>,
-                    borderColor: '#2c7e34',
-                    backgroundColor: 'rgba(44,126,52,0.18)',
-                    fill: true,
-                    tension: 0.35
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
-        }));
+        var commandesMoisCanvas = document.getElementById('chart-commandes-mois');
+        if (commandesMoisCanvas) {
+            charts.push(new Chart(commandesMoisCanvas, {
+                type: 'line',
+                data: {
+                    labels: <?php echo json_encode(array_keys($commandesParMois)); ?>,
+                    datasets: [{
+                        label: 'Commandes',
+                        data: <?php echo json_encode(array_values($commandesParMois)); ?>,
+                        borderColor: '#2c7e34',
+                        backgroundColor: 'rgba(44,126,52,0.18)',
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
+            }));
+        }
 
-        charts.push(new Chart(document.getElementById('chart-modes-paiement'), {
-            type: 'pie',
-            data: {
-                labels: <?php echo json_encode(array_map('ucfirst', array_keys($modePaiementDist))); ?>,
-                datasets: [{
-                    data: <?php echo json_encode(array_values($modePaiementDist)); ?>,
-                    backgroundColor: ['#ef5350', '#42a5f5', '#ffca28', '#66bb6a', '#ab47bc', '#ff7043', '#26c6da']
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
-        }));
+        var modesPaiementCanvas = document.getElementById('chart-modes-paiement');
+        if (modesPaiementCanvas) {
+            charts.push(new Chart(modesPaiementCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: <?php echo json_encode(array_map('ucfirst', array_keys($modePaiementDist))); ?>,
+                    datasets: [{
+                        data: <?php echo json_encode(array_values($modePaiementDist)); ?>,
+                        backgroundColor: ['#ef5350', '#42a5f5', '#ffca28', '#66bb6a', '#ab47bc', '#ff7043', '#26c6da']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
+            }));
+        }
 
-        charts.push(new Chart(document.getElementById('chart-statut-livraison'), {
-            type: 'pie',
-            data: {
-                labels: <?php echo json_encode(array_keys($statutDist)); ?>,
-                datasets: [{
-                    data: <?php echo json_encode(array_values($statutDist)); ?>,
-                    backgroundColor: ['#ffd54f', '#64b5f6', '#81c784', '#ef5350']
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
-        }));
+        var statutChartCanvas = document.getElementById('chart-statut-livraison');
+        if (statutChartCanvas) {
+            charts.push(new Chart(statutChartCanvas, {
+                type: 'pie',
+                data: {
+                    labels: <?php echo json_encode(array_keys($statutDist)); ?>,
+                    datasets: [{
+                        data: <?php echo json_encode(array_values($statutDist)); ?>,
+                        backgroundColor: ['#ffd54f', '#64b5f6', '#81c784', '#ef5350']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
+            }));
+        }
 
-        charts.push(new Chart(document.getElementById('chart-livraisons-jour'), {
-            type: 'line',
-            data: {
-                labels: <?php echo json_encode(array_keys($livraisonsParJour)); ?>,
-                datasets: [{
-                    label: 'Livraisons',
-                    data: <?php echo json_encode(array_values($livraisonsParJour)); ?>,
-                    borderColor: '#1976d2',
-                    backgroundColor: 'rgba(25,118,210,0.18)',
-                    fill: true,
-                    tension: 0.35
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
-        }));
+        var livraisonsJourCanvas = document.getElementById('chart-livraisons-jour');
+        if (livraisonsJourCanvas) {
+            charts.push(new Chart(livraisonsJourCanvas, {
+                type: 'line',
+                data: {
+                    labels: <?php echo json_encode(array_keys($livraisonsParJour)); ?>,
+                    datasets: [{
+                        label: 'Livraisons',
+                        data: <?php echo json_encode(array_values($livraisonsParJour)); ?>,
+                        borderColor: '#1976d2',
+                        backgroundColor: 'rgba(25,118,210,0.18)',
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, aspectRatio: 2.2 }
+            }));
+        }
     }
 
-    function setVue(v) {
-        var isC = v === 'commande';
+    function setTitle(mode) {
+        if (!titleEl) return;
+        if (mode === 'commande') {
+            titleEl.textContent = 'Liste des commandes';
+        } else if (mode === 'livraison') {
+            titleEl.textContent = 'Liste des Livraisons';
+        } else {
+            titleEl.textContent = 'Liste de commande et livraison';
+        }
+    }
+
+    function setMode(mode) {
+        var isDashboard = mode === 'dashboard';
+        var isC = mode === 'commande';
+        var isL = mode === 'livraison';
         wrapC.hidden = !isC;
-        wrapL.hidden = isC;
-        dashC.hidden = !isC;
-        dashL.hidden = isC;
+        wrapL.hidden = !isL;
+        dashGlobal.hidden = !isDashboard;
+        if (titleRow) {
+            titleRow.hidden = isDashboard;
+            titleRow.style.display = isDashboard ? 'none' : 'flex';
+        }
+        if (titleActions) {
+            titleActions.hidden = isDashboard;
+        }
+        panelFiltres.hidden = isDashboard;
+        tableWrap.hidden = isDashboard;
+        filtersCommande.hidden = !isC;
+        filtersLivraison.hidden = !isL;
+
         btnC.classList.toggle('btn-commande-primary', isC);
         btnC.classList.toggle('btn-commande-outline', !isC);
         btnC.classList.toggle('is-active', isC);
-        btnL.classList.toggle('btn-commande-primary', !isC);
-        btnL.classList.toggle('btn-commande-outline', isC);
-        btnL.classList.toggle('is-active', !isC);
+        btnL.classList.toggle('btn-commande-primary', isL);
+        btnL.classList.toggle('btn-commande-outline', !isL);
+        btnL.classList.toggle('is-active', isL);
+        btnD.classList.toggle('btn-commande-primary', isDashboard);
+        btnD.classList.toggle('btn-commande-outline', !isDashboard);
+        btnD.classList.toggle('is-active', isDashboard);
+        setTitle(mode);
         if (charts.length > 0) {
             setTimeout(function () {
                 charts.forEach(function (chart) { chart.resize(); });
             }, 0);
         }
         try {
-            history.replaceState(null, '', 'list-com-liv.php?vue=' + (isC ? 'commande' : 'livraison'));
+            var vueParam = isL ? 'livraison' : 'commande';
+            history.replaceState(null, '', 'list-com-liv.php?vue=' + vueParam + '&mode=' + mode);
         } catch (e) {}
     }
 
-    btnC.addEventListener('click', function () { setVue('commande'); });
-    btnL.addEventListener('click', function () { setVue('livraison'); });
-    setVue(vueInit);
+    function attachOrderToggle(button, hiddenInput) {
+        if (!button || !hiddenInput) return;
+        function reverseAndSubmit() {
+            var next = hiddenInput.value === 'asc' ? 'desc' : 'asc';
+            hiddenInput.value = next;
+            var form = button.closest('form');
+            if (form) form.submit();
+        }
+        button.addEventListener('click', reverseAndSubmit);
+        button.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                reverseAndSubmit();
+            }
+        });
+    }
+
+    btnC.addEventListener('click', function () { setMode('commande'); });
+    btnL.addEventListener('click', function () { setMode('livraison'); });
+    btnD.addEventListener('click', function () { setMode('dashboard'); });
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert('Export PDF indisponible.');
+                return;
+            }
+            var isCommande = !wrapC.hidden;
+            var activeTable = isCommande ? wrapC.querySelector('table') : wrapL.querySelector('table');
+            if (!activeTable) {
+                alert('Aucun tableau a exporter.');
+                return;
+            }
+            var doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
+            var title = isCommande ? 'Liste des commandes' : 'Liste des livraisons';
+            var now = new Date();
+            var dateLabel = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            doc.setFontSize(14);
+            doc.text(title + ' - ' + dateLabel, 14, 14);
+            doc.autoTable({
+                html: activeTable,
+                startY: 20,
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [44, 126, 52] }
+            });
+            doc.save((isCommande ? 'commandes' : 'livraisons') + '-' + dateLabel + '.pdf');
+        });
+    }
+    attachOrderToggle(orderBtnCommande, sortOrderCommande);
+    attachOrderToggle(orderBtnLivraison, sortOrderLivraison);
+    if (modeInit === 'dashboard' || modeInit === 'commande' || modeInit === 'livraison') {
+        setMode(modeInit);
+    } else {
+        setMode(vueInit === 'livraison' ? 'livraison' : 'commande');
+    }
 })();
 </script>
 <script src="js/controles.js" defer></script>

@@ -47,6 +47,20 @@ function panier_add_product(int $idProduit, float $prixUnitaire): void
     $_SESSION['panier'][$idProduit]['prix_unitaire'] = $prixUnitaire;
 }
 
+function panier_decrement_product(int $idProduit): void
+{
+    panier_ensure_session();
+    if (!isset($_SESSION['panier'][$idProduit])) {
+        return;
+    }
+    $q = (int) ($_SESSION['panier'][$idProduit]['quantite'] ?? 0) - 1;
+    if ($q < 1) {
+        unset($_SESSION['panier'][$idProduit]);
+        return;
+    }
+    $_SESSION['panier'][$idProduit]['quantite'] = $q;
+}
+
 function panier_remove_product(int $idProduit): void
 {
     panier_ensure_session();

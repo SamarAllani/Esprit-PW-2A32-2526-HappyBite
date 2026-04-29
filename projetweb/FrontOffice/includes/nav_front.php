@@ -57,3 +57,4 @@ $nav_icon_class = static function (string $key, string $current): string {
         </details>
     </div>
 </nav>
+<?php include_once __DIR__ . '/../Ai.php'; ?>

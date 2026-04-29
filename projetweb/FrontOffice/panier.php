@@ -16,6 +16,27 @@ if (isset($_GET['supprimer'])) {
     exit;
 }
 
+if (isset($_GET['plus'])) {
+    $idPlus = (int) $_GET['plus'];
+    if ($idPlus > 0) {
+        $p = $produitController->getProduitById($idPlus);
+        if ($p) {
+            panier_add_product($idPlus, (float) $p['prix']);
+        }
+    }
+    header('Location: panier.php');
+    exit;
+}
+
+if (isset($_GET['moins'])) {
+    $idMoins = (int) $_GET['moins'];
+    if ($idMoins > 0) {
+        panier_decrement_product($idMoins);
+    }
+    header('Location: panier.php');
+    exit;
+}
+
 $items = panier_get_items();
 $iconeSuppr = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'images/delete.svg';
 
@@ -69,12 +90,22 @@ require __DIR__ . '/includes/nav_front.php';
                                     × <?php echo (int) $ligne['quantite']; ?>
                                 </span>
                             </div>
-                            <a href="panier.php?supprimer=<?php echo (int) $ligne['id_produit']; ?>"
-                               class="panier-ligne-suppr"
-                               aria-label="Retirer du panier"
-                               title="Retirer">
-                                <img src="<?php echo htmlspecialchars($iconeSuppr); ?>" alt="" width="24" height="24">
-                            </a>
+                            <div class="panier-ligne-actions">
+                                <a href="panier.php?moins=<?php echo (int) $ligne['id_produit']; ?>"
+                                   class="panier-ligne-step panier-ligne-step--minus"
+                                   aria-label="Retirer une quantité"
+                                   title="Retirer une quantité">-</a>
+                                <a href="panier.php?supprimer=<?php echo (int) $ligne['id_produit']; ?>"
+                                   class="panier-ligne-suppr"
+                                   aria-label="Retirer du panier"
+                                   title="Retirer">
+                                    <img src="<?php echo htmlspecialchars($iconeSuppr); ?>" alt="" width="24" height="24">
+                                </a>
+                                <a href="panier.php?plus=<?php echo (int) $ligne['id_produit']; ?>"
+                                   class="panier-ligne-step panier-ligne-step--plus"
+                                   aria-label="Ajouter une quantité"
+                                   title="Ajouter une quantité">+</a>
+                            </div>
                         </li>
                     <?php } ?>
                 </ul>

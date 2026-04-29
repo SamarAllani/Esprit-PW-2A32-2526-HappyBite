@@ -283,10 +283,10 @@
 
         .panier-toast {
             position: fixed;
-            bottom: 88px;
+            top: 18px;
             left: 50%;
-            transform: translateX(-50%) translateY(12px);
-            z-index: 100;
+            transform: translateX(-50%) translateY(-12px);
+            z-index: 2100;
             padding: 12px 20px;
             background: #2C7E34;
             color: #fff;
@@ -560,6 +560,34 @@
             width: 24px;
             height: 24px;
             object-fit: contain;
+        }
+
+        .panier-ligne-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .panier-ligne-step {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #2e7d32;
+        }
+
+        .panier-ligne-step:hover {
+            background: #2e7d32;
+            color: #fff;
         }
 
         .panier-panel-actions {

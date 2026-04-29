@@ -117,6 +117,17 @@ class CommandeController
         return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** @return array<string, mixed>|null */
+    public function getLatestCommande(): ?array
+    {
+        $stmt = $this->pdo->query('SELECT * FROM commande ORDER BY id_commande DESC LIMIT 1');
+        if ($stmt === false) {
+            return null;
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     /**
      * Reconstruit la liste des noms depuis commande_produit (pour affichage).
      */
