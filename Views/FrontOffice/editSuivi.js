@@ -5,7 +5,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const get = (name) => form.querySelector(`[name="${name}"]`);
 
-    const dateInput = get("date_jour");
     const poidsInput = get("poids");
     const caloriesInput = get("calories");
     const sommeilInput = get("sommeil_heures");
@@ -13,7 +12,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const sportInput = get("nbr_activites_sport");
 
     const errors = [
-        "err-date",
         "err-poids",
         "err-calories",
         "err-sommeil",
@@ -44,44 +42,37 @@ document.addEventListener("DOMContentLoaded", function () {
         let hasError = false;
         clearErrors();
 
-        if (!dateInput.value) {
-            showError("err-date", "Date obligatoire");
-            hasError = true;
-        }
-
-        const poids = Number(poidsInput.value);
+        const poids = Number(poidsInput?.value);
         if (!Number.isFinite(poids) || poids <= 12 || poids > 300) {
             showError("err-poids", "Poids invalide");
             hasError = true;
         }
 
-        const calories = Number(caloriesInput.value);
+        const calories = Number(caloriesInput?.value);
         if (!Number.isFinite(calories) || calories <= 0) {
             showError("err-calories", "Calories invalides");
             hasError = true;
         }
 
-        const sommeil = Number(sommeilInput.value);
+        const sommeil = Number(sommeilInput?.value);
         if (!Number.isFinite(sommeil) || sommeil <= 0 || sommeil > 24) {
             showError("err-sommeil", "Sommeil invalide");
             hasError = true;
         }
 
-        const pas = Number(pasInput.value);
+        const pas = Number(pasInput?.value);
         if (!Number.isFinite(pas) || pas <= 0) {
             showError("err-pas", "Pas invalides");
             hasError = true;
         }
 
-        const sport = Number(sportInput.value);
+        const sport = Number(sportInput?.value);
         if (!Number.isFinite(sport) || sport < 0) {
             showError("err-sport", "Sport invalide");
             hasError = true;
         }
 
-        // HYDRATATION FIX
         const hydratation = document.querySelector('input[name="hydratation_litre"]:checked');
-
         if (!hydratation) {
             showError("err-hydratation", "Choisir hydratation");
             hasError = true;
@@ -95,5 +86,4 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
         }
     });
-
 });

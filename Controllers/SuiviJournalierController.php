@@ -29,56 +29,58 @@ class SuiviJournalierController
     /* =========================
        CREATE
     ========================= */
-    public function create($id_utilisateur)
-    {
-        $id_profil = $this->getProfilId($id_utilisateur);
+public function create($id_utilisateur)
+{
+    $id_profil = $this->getProfilId($id_utilisateur);
 
-        if (!$id_profil) {
-            die("Crée un profil santé d'abord.");
-        }
+    if (!$id_profil) {
+        die("Crée un profil santé d'abord.");
+    }
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // dernier suivi
+    $lastSuivi = $this->getLastSuivi($id_utilisateur);
 
-            $date = $_POST['date_jour'];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-            // check doublon
-            $check = $this->db->prepare("
-                SELECT id FROM suivi_journalier
-                WHERE id_profil_sante = :p AND date_jour = :d
-            ");
+        $date = date('Y-m-d');
 
-            $check->execute([
-                'p' => $id_profil,
-                'd' => $date
-            ]);
+        $check = $this->db->prepare("
+            SELECT id FROM suivi_journalier
+            WHERE id_profil_sante = :p AND date_jour = :d
+        ");
 
-            if ($check->fetch()) {
-                $this->redirect($id_utilisateur);
-            }
+        $check->execute([
+            'p' => $id_profil,
+            'd' => $date
+        ]);
 
-            $stmt = $this->db->prepare("
-                INSERT INTO suivi_journalier
-                (id_profil_sante, date_jour, poids, calories, sommeil_heures, nbr_pas, nbr_activites_sport, hydratation_litre)
-                VALUES
-                (:p, :d, :poids, :cal, :som, :pas, :sport, :hydr)
-            ");
-
-            $stmt->execute([
-                'p' => $id_profil,
-                'd' => $date,
-                'poids' => $_POST['poids'] ?? null,
-                'cal' => $_POST['calories'] ?? null,
-                'som' => $_POST['sommeil_heures'] ?? null,
-                'pas' => $_POST['nbr_pas'] ?? null,
-                'sport' => $_POST['nbr_activites_sport'] ?? null,
-                'hydr' => $_POST['hydratation_litre'] ?? null
-            ]);
-
+        if ($check->fetch()) {
             $this->redirect($id_utilisateur);
         }
 
-        include __DIR__ . '/../Views/FrontOffice/createSuivi.php';
+        $stmt = $this->db->prepare("
+            INSERT INTO suivi_journalier
+            (id_profil_sante, date_jour, poids, calories, sommeil_heures, nbr_pas, nbr_activites_sport, hydratation_litre)
+            VALUES
+            (:p, :d, :poids, :cal, :som, :pas, :sport, :hydr)
+        ");
+
+        $stmt->execute([
+            'p' => $id_profil,
+            'd' => $date,
+            'poids' => $_POST['poids'] ?? null,
+            'cal' => $_POST['calories'] ?? null,
+            'som' => $_POST['sommeil_heures'] ?? null,
+            'pas' => $_POST['nbr_pas'] ?? null,
+            'sport' => $_POST['nbr_activites_sport'] ?? null,
+            'hydr' => $_POST['hydratation_litre'] ?? null
+        ]);
+
+        $this->redirect($id_utilisateur);
     }
+
+    include __DIR__ . '/../Views/FrontOffice/createSuivi.php';
+}
 
     /* =========================
        LIST USER
@@ -163,7 +165,7 @@ public function update($id)
 
         $stmt = $this->db->prepare("
             UPDATE suivi_journalier
-            SET date_jour = :d,
+            SET 
                 poids = :p,
                 calories = :c,
                 sommeil_heures = :s,
@@ -174,7 +176,7 @@ public function update($id)
         ");
 
         $stmt->execute([
-            'd' => $_POST['date_jour'],
+            
             'p' => $_POST['poids'],
             'c' => $_POST['calories'],
             's' => $_POST['sommeil_heures'],
@@ -201,31 +203,38 @@ public function update($id)
 }  
 public function list($id_utilisateur)
 {
-    // USER
     $stmt = $this->db->prepare("SELECT * FROM utilisateur WHERE id = ?");
     $stmt->execute([$id_utilisateur]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // PROFIL
     $stmt = $this->db->prepare("SELECT * FROM profil_sante WHERE id_utilisateur = ?");
     $stmt->execute([$id_utilisateur]);
     $profil = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // 👇 THIS IS WHAT YOU FORGOT (again)
     if ($profil) {
-            foreach (['allergenes', 'carences', 'maladies'] as $key) {
-
-                $data = json_decode($profil[$key], true);
-
-                if (!is_array($data)) {
-                    $data = [];
-                }
-
-                $profil[$key] = implode(', ', $data);
-            }
+        foreach (['allergenes', 'carences', 'maladies'] as $key) {
+            $data = json_decode($profil[$key], true);
+            if (!is_array($data)) $data = [];
+            $profil[$key] = implode(', ', $data);
         }
-    // SUIVIS
+    }
+
     $suivis = $this->getSuiviUser($id_utilisateur);
+
+    // 🔥 FILTER DATE (ICI IMPORTANT)
+    $date = $_GET['date'] ?? null;
+
+    if ($date) {
+        $suivis = array_filter($suivis, fn($s) => $s['date_jour'] === $date);
+    }
+
+    // 🔥 SORT
+    $suivis = $this->sortSuivis($suivis, [
+        'poids' => $_GET['sort_poids'] ?? null,
+        'calories' => $_GET['sort_calories'] ?? null,
+        'sommeil' => $_GET['sort_sommeil'] ?? null,
+        'pas' => $_GET['sort_pas'] ?? null,
+    ]);
 
     require __DIR__ . '/../Views/FrontOffice/user_health_space.php';
 }
@@ -326,5 +335,55 @@ public function listAjax($id_utilisateur)
     header('Content-Type: application/json');
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     exit();
+}
+public function getLastSuivi($id_utilisateur)
+{
+    $stmt = $this->db->prepare("
+        SELECT sj.*
+        FROM suivi_journalier sj
+        JOIN profil_sante ps ON sj.id_profil_sante = ps.id
+        WHERE ps.id_utilisateur = :id
+        ORDER BY sj.date_jour DESC
+        LIMIT 1
+    ");
+
+    $stmt->execute(['id' => $id_utilisateur]);
+
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+private function sortSuivis(array $suivis, array $params)
+{
+    $field = null;
+    $direction = 'desc';
+
+    if (!empty($params['poids'])) {
+        $field = 'poids';
+        $direction = $params['poids'];
+    } elseif (!empty($params['calories'])) {
+        $field = 'calories';
+        $direction = $params['calories'];
+    } elseif (!empty($params['sommeil'])) {
+        $field = 'sommeil_heures';
+        $direction = $params['sommeil'];
+    } elseif (!empty($params['pas'])) {
+        $field = 'nbr_pas';
+        $direction = $params['pas'];
+    }
+
+    // TRI PAR DEFAUT = date DESC
+    if (!$field) {
+        usort($suivis, fn($a, $b) =>
+            strtotime($b['date_jour']) <=> strtotime($a['date_jour'])
+        );
+        return $suivis;
+    }
+
+    usort($suivis, function ($a, $b) use ($field, $direction) {
+        return $direction === 'asc'
+            ? $a[$field] <=> $b[$field]
+            : $b[$field] <=> $a[$field];
+    });
+
+    return $suivis;
 }
 }

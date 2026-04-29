@@ -18,27 +18,8 @@ class ProfilSanteController
         exit();
     }
 
-    public function show($id_utilisateur)
-    {
-$stmt = $this->db->prepare("SELECT * FROM profil_sante WHERE id_utilisateur = ?");
-$stmt->execute([$id_utilisateur]);
-$profil = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if ($profil) {
-
-    foreach (['allergenes', 'carences', 'maladies'] as $key) {
-
-        $profil[$key] = json_decode($profil[$key], true);
-
-        if (!is_array($profil[$key])) {
-            $profil[$key] = [];
-        }
-    }
-}
-
-        include __DIR__ . '/../Views/FrontOffice/show.php';
-    }
-
+  
     public function create($id_utilisateur)
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {

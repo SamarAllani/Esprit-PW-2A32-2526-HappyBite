@@ -33,18 +33,18 @@ document.addEventListener("DOMContentLoaded", function () {
         const poids  = parseFloat(poidsInput.value);
 
         // Validation taille
-        if (isNaN(taille) || taille <= 0) {
+        if (isNaN(taille) || taille < 55 || taille > 251) {
             if (errTaille) {
-                errTaille.textContent = "⚠️ Taille invalide";
+                errTaille.textContent = "⚠️ Taille invalide(55 - 251 cm)";
                 errTaille.style.display = "block";
             }
             valid = false;
         }
 
         // Validation poids
-        if (isNaN(poids) || poids <= 12 || poids > 300) {
+        if (isNaN(poids) || poids < 12 || poids > 700) {
             if (errPoids) {
-                errPoids.textContent = "⚠️ Poids invalide (12 - 300 kg)";
+                errPoids.textContent = "⚠️ Poids invalide (12 - 700 kg)";
                 errPoids.style.display = "block";
             }
             valid = false;

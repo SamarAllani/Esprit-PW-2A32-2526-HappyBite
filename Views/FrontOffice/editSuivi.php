@@ -12,7 +12,31 @@ $suivi = $suivi ?? [];
 
 <body>
 
-<?php include __DIR__ . '/../partials/navbar.php'; ?>
+
+
+<nav class="main-navbar">
+    <div class="nav-container">
+        <a href="index.php" class="nav-logo">
+           <img src="/Views/assets/logo.png" alt="HappyBite">
+            <span>HappyBite</span>
+        </a>
+
+        <ul class="nav-links">
+            <li><a href="index.php">Accueil</a></li>
+            <li><a href="List-Produit.php" class="active">Produits</a></li>
+            <li><a href="List-Recette.php">Recettes</a></li>
+            <li><a href="#">Commande</a></li>
+        </ul>
+
+        <div class="nav-user">
+            <a href="List-Frigo.php" class="nav-action">Frigo</a>
+            <a href="#" class="nav-action">Commandes</a>
+            <a href="#" class="nav-action active">Santé</a>
+            <a href="#" class="nav-action">Profil</a>
+        </div>
+    </div>
+</nav>
+
 
 <!-- TITRE -->
 <h1>Modifier un suivi journalier</h1>
@@ -22,8 +46,11 @@ $suivi = $suivi ?? [];
       action="index.php?action=updateSuivi&id=<?= $suivi['id'] ?>&id_utilisateur=<?= $id_utilisateur ?>">
 
     <label>Date :</label><br>
-    <input type="date" name="date_jour"
-           value="<?= htmlspecialchars($suivi['date_jour'] ?? '') ?>">
+  <input type="text"
+       value="<?= htmlspecialchars($suivi['date_jour'] ?? '') ?>"
+       disabled>
+
+
     <div id="err-date" class="error"></div>
     <br>
 
@@ -46,7 +73,7 @@ $suivi = $suivi ?? [];
     <br>
 
     <label>Nombre de pas :</label><br>
-    <input type="number" name="nbr_pas"
+    <input type="number" name="nbr_pas" step="1000"
            value="<?= htmlspecialchars($suivi['nbr_pas'] ?? '') ?>">
     <div id="err-pas" class="error"></div>
     <br>
@@ -91,14 +118,15 @@ $hydratation = $suivi['hydratation_litre'] ?? '';
     <div id="err-hydratation" class="error"></div>
     <br>
 
-    <button type="submit">Mettre à jour</button>
+    <button class="button-enregister" type="submit">Mettre à jour</button>
 </form>
-<script src="Views/FrontOffice/editSuivi.js"></script>
+
 <br>
 
 <a href="index.php?action=showProfilSante&id_utilisateur=<?= $id_utilisateur ?? '' ?>">
     Retour
 </a>
 </div>
+<script src="Views/FrontOffice/editSuivi.js"></script>
 </body>
 </html>

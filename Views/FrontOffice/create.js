@@ -36,13 +36,38 @@ document.getElementById("formProfil").addEventListener("submit", function (e) {
         valid = false;
     }
 
-    // Allergènes (optionnel, donc pas bloquant)
-    let allergenes = document.querySelectorAll('input[name="allergenes[]"]:checked');
-    if (allergenes.length === 0) {
-        let err = document.getElementById("error_allergenes");
-        err.innerText = "Vous pouvez sélectionner des allergènes (optionnel)";
-        err.style.display = "block";
-    }
+ // ALLERGENES
+let allergenes = document.querySelectorAll('input[name="allergenes[]"]:checked');
+let infoAll = document.getElementById("info_allergenes");
+
+if (allergenes.length === 0) {
+    infoAll.innerText = "Vous pouvez sélectionner des allergènes (optionnel)";
+    infoAll.style.display = "block";
+} else {
+    infoAll.style.display = "none";
+}
+
+// CARENCES
+let carences = document.querySelectorAll('input[name="carences[]"]:checked');
+let infoCar = document.getElementById("info_carences");
+
+if (carences.length === 0) {
+    infoCar.innerText = "Vous pouvez sélectionner des carences (optionnel)";
+    infoCar.style.display = "block";
+} else {
+    infoCar.style.display = "none";
+}
+
+// MALADIES
+let maladies = document.querySelectorAll('input[name="maladies[]"]:checked');
+let infoMal = document.getElementById("info_maladies");
+
+if (maladies.length === 0) {
+    infoMal.innerText = "Vous pouvez sélectionner des maladies (optionnel)";
+    infoMal.style.display = "block";
+} else {
+    infoMal.style.display = "none";
+}
 
     if (!valid) {
         e.preventDefault();

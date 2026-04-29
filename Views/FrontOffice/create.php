@@ -4,18 +4,10 @@
     <meta charset="UTF-8">
     <title>Créer Profil Santé</title>
 <link rel="stylesheet" href="/Views/assets/css/sytle.css">
-    <style>
-        .error {
-            color: red;
-            font-size: 14px;
-            margin-bottom: 5px;
-            display: none;
-        }
-        
-    </style>
-    <head>
-    <meta charset="UTF-8">
-    <title>Créer Profil Santé</title>
+
+
+    
+    
 
     <style>
         /* RESET */
@@ -142,9 +134,33 @@
 
     </style>
 </head>
-</head>
+
 <body>
-<?php include __DIR__ . '/../partials/navbar.php'; ?>
+
+
+<nav class="main-navbar">
+    <div class="nav-container">
+        <a href="index.php" class="nav-logo">
+           <img src="/Views/assets/logo.png" alt="HappyBite">
+            <span>HappyBite</span>
+        </a>
+
+        <ul class="nav-links">
+            <li><a href="index.php">Accueil</a></li>
+            <li><a href="List-Produit.php" class="active">Produits</a></li>
+            <li><a href="List-Recette.php">Recettes</a></li>
+            <li><a href="#">Commande</a></li>
+        </ul>
+
+        <div class="nav-user">
+            <a href="List-Frigo.php" class="nav-action">Frigo</a>
+            <a href="#" class="nav-action">Commandes</a>
+            <a href="#" class="nav-action active">Santé</a>
+            <a href="#" class="nav-action">Profil</a>
+        </div>
+    </div>
+</nav>
+
 <div class="container">
 <h1>Créer mon profil santé</h1>
 
@@ -172,94 +188,34 @@
     </select><br><br>
     <div class="error" id="error_objectif"></div>
     <!-- Allergènes -->
-    <div class="error" id="error_allergenes"></div>
-    <label>Allergènes :</label><br>
-    <input type="checkbox" name="allergenes[]" value="Gluten"> Gluten<br>
-    <input type="checkbox" name="allergenes[]" value="Lactose"> Lactose<br>
-    <input type="checkbox" name="allergenes[]" value="Sucre"> Sucre<br>
-    <input type="checkbox" name="allergenes[]" value="Fruits à coque"> Fruits à coque<br><br>
+    
+   <!-- Allergènes -->
+<label>Allergènes :</label>
+<div class="info" id="info_allergenes"></div>
+<input type="checkbox" name="allergenes[]" value="Gluten"> Gluten<br>
+<input type="checkbox" name="allergenes[]" value="Lactose"> Lactose<br>
+<input type="checkbox" name="allergenes[]" value="Sucre"> Sucre<br>
+<input type="checkbox" name="allergenes[]" value="Fruits à coque"> Fruits à coque<br><br>
 
-    <!-- Carences -->
-    <div class="error" id="error_carences"></div>
-    <label>Carences :</label><br>
-    <input type="checkbox" name="carences[]" value="Fer"> Fer<br>
-    <input type="checkbox" name="carences[]" value="Calcium"> Calcium<br>
-    <input type="checkbox" name="carences[]" value="Vitamine C"> Vitamine C<br>
-    <input type="checkbox" name="carences[]" value="Vitamine D"> Vitamine D<br><br>
+<!-- Carences -->
+<label>Carences :</label>
+<div class="info" id="info_carences"></div>
+<input type="checkbox" name="carences[]" value="Fer"> Fer<br>
+<input type="checkbox" name="carences[]" value="Calcium"> Calcium<br>
+<input type="checkbox" name="carences[]" value="Vitamine C"> Vitamine C<br>
+<input type="checkbox" name="carences[]" value="Vitamine D"> Vitamine D<br><br>
 
-    <!-- Maladies -->
-    <div class="error" id="error_maladies"></div>
-    <label>Maladies :</label><br>
-    <input type="checkbox" name="maladies[]" value="Diabète"> Diabète<br>
-    <input type="checkbox" name="maladies[]" value="Cholestérol"> Cholestérol<br>
-    <input type="checkbox" name="maladies[]" value="Hypertension"> Hypertension<br><br>
-
+<!-- Maladies -->
+<label>Maladies :</label>
+<div class="info" id="info_maladies"></div>
+<input type="checkbox" name="maladies[]" value="Diabète"> Diabète<br>
+<input type="checkbox" name="maladies[]" value="Cholestérol"> Cholestérol<br>
+<input type="checkbox" name="maladies[]" value="Hypertension"> Hypertension<br><br>
+<div class="error" id="error_allergenes"></div>
     <button type="submit">Enregistrer</button>
 
 </form>
 </div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const form = document.getElementById("formProfil");
-
-    form.addEventListener("submit", function (e) {
-
-        let valid = true;
-
-        // reset erreurs
-        document.querySelectorAll(".error").forEach(el => {
-            el.style.display = "none";
-            el.innerText = "";
-        });
-
-        // récupération valeurs (sécurisée)
-        const taille = Number(document.getElementById("taille").value);
-        const poids = Number(document.getElementById("poids").value);
-        const objectif = document.getElementById("objectif").value;
-
-        console.log("DEBUG => taille:", taille, "poids:", poids);
-
-        // TAILLE
-        if (!Number.isFinite(taille) || taille < 55 || taille > 251) {
-            const err = document.getElementById("error_taille");
-            err.innerText = "Taille doit être entre 55 et 251 cm";
-            err.style.display = "block";
-            valid = false;
-        }
-
-        // POIDS
-        if (!Number.isFinite(poids) || poids < 12 || poids > 700) {
-            const err = document.getElementById("error_poids");
-            err.innerText = "Poids doit être entre 12 et 700 kg";
-            err.style.display = "block";
-            valid = false;
-        }
-
-        // OBJECTIF
-        if (!objectif) {
-            const err = document.getElementById("error_objectif");
-            err.innerText = "Veuillez choisir un objectif";
-            err.style.display = "block";
-            valid = false;
-        }
-
-        // ALLERGÈNES (optionnel)
-        const allergenes = document.querySelectorAll('input[name="allergenes[]"]:checked');
-        if (allergenes.length === 0) {
-            document.getElementById("error_allergenes").style.display = "none";
-        }
-
-        // STOP FORM SUBMIT SI ERREUR
-        if (!valid) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-    });
-
-});
-</script>
-
+<script src="/Views/FrontOffice/create.js"></script>
 </body>
 </html>

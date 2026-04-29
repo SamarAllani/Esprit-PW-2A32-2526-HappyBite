@@ -86,12 +86,19 @@ function formatList($data) {
 
     <!-- CHART -->
     <div class="card chart-card">
+
         <h3>Répartition des utilisateurs</h3>
+       
+ 
+
         <canvas id="pieChart"></canvas>
     </div>
 
     <!-- TABLE -->
     <div class="card">
+         <a href="export_users_pdf.php?search=<?= urlencode($search ?? '') ?>" 
+   class="pdf-btn">
+    📄 Export PDF</a> 
         <h2>Profil santé des utilisateurs</h2>
 
         <table>
