@@ -1,13 +1,14 @@
 <?php
-include '../../Controllers/ProduitController.php';
-include '../../Controllers/CategorieController.php';
-include '../../Controllers/RecetteController.php';
-
+require_once __DIR__ . '/../../Controllers/ProduitController.php';
+require_once __DIR__ . '/../../Controllers/CategorieController.php';
+require_once __DIR__ . '/../../Controllers/RecetteController.php';
+require_once __DIR__ . '/../../Controllers/FrigoController.php';
 session_start();
 
 $produitController = new ProduitController();
 $categorieController = new CategorieController();
 $recetteController = new RecetteController();
+$frigoController = new FrigoController();
 
 $messagePromo = $_SESSION['message_promo'] ?? null;
 $typeMessagePromo = $_SESSION['type_message_promo'] ?? null;
@@ -97,6 +98,17 @@ if (isset($_GET['delete_recipe'])) {
 $produits = $produitController->listProduits();
 $categories = $categorieController->listCategories();
 $recettes = $recetteController->listRecettes();
+
+$topProduitsFrigo = $frigoController->getTopProduitsFrigo();
+$categoriesFrigo = $frigoController->getCategoriesLesPlusPresentes();
+
+$chartCategoriesFrigoLabels = [];
+$chartCategoriesFrigoValues = [];
+
+foreach ($categoriesFrigo as $cat) {
+    $chartCategoriesFrigoLabels[] = $cat['nom_categorie'] ?? 'Non classé';
+    $chartCategoriesFrigoValues[] = $cat['total'] ?? 0;
+}
 
 function toFloatValue($value)
 {
@@ -347,6 +359,26 @@ $legendColors = ['#2f8b3a', '#4cb963', '#8bc34a', '#ffca28', '#29b6f6', '#ab47bc
             flex-direction: column;
         }
 
+        .frigo-top-card {
+            background: #ffffff;
+            border: 1px solid #eef0ef;
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            margin-bottom: 14px;
+        }
+
+        .frigo-rank {
+            display: inline-block;
+            background: #eaf6ee;
+            color: #2f8b3a;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
         .health-score-good {
             display: inline-block;
             width: fit-content;
@@ -406,14 +438,10 @@ $legendColors = ['#2f8b3a', '#4cb963', '#8bc34a', '#ffca28', '#29b6f6', '#ab47bc
         .health-image-placeholder { font-size: 0.8rem; color: #90a09a; text-align: center; padding: 8px; }
         .health-product-name { font-size: 1.05rem; font-weight: 800; color: #1f2d2a; margin-bottom: 10px; }
         .health-product-meta { color: #6f7d79; font-size: 0.92rem; margin-bottom: 6px; }
-        .health-score-good { display: inline-block; background: #eaf6ee; color: #2f8b3a; border-radius: 999px; padding: 6px 12px; font-weight: 700; margin-bottom: 10px; font-size: 0.9rem; }
-        .health-score-bad { display: inline-block; background: #fdeaea; color: #dc3545; border-radius: 999px; padding: 6px 12px; font-weight: 700; margin-bottom: 10px; font-size: 0.9rem; }
         .promo-inline-form { margin-top: 12px; }
         .promo-inline-form input { border-radius: 999px; font-size: 0.95rem; }
         .promo-inline-form .btn { border-radius: 999px; font-size: 0.9rem; }
         .recipe-products-list { color: #6f7d79; font-size: 0.9rem; margin-top: 8px; }
-        .badge-front { display: inline-block; margin-bottom: 10px; background: #fff3cd; color: #856404; border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; font-weight: 700; }
-        .badge-promo { display: inline-block; margin-bottom: 10px; background: #fff3cd; color: #856404; border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; font-weight: 700; }
 
         .recipe-actions-vertical {
             display: flex;
@@ -741,26 +769,39 @@ $legendColors = ['#2f8b3a', '#4cb963', '#8bc34a', '#ffca28', '#29b6f6', '#ab47bc
                 </div>
             </div>
 
-            <h2 class="dashboard-section-title">Analyse par catégorie</h2>
+            <h2 class="dashboard-section-title">Analyse des frigos clients</h2>
+
             <div class="row g-4 mb-5">
-                <div class="col-lg-4">
+                <div class="col-lg-5">
                     <div class="dashboard-chart-card">
-                        <div class="dashboard-chart-title">Calories moyennes par catégorie</div>
-                        <canvas id="chartCaloriesCategorie"></canvas>
+                        <div class="dashboard-chart-title">Top 3 produits dans les frigos</div>
+
+                        <?php if (empty($topProduitsFrigo)) { ?>
+                            <p class="text-muted">Aucun produit trouvé dans les frigos.</p>
+                        <?php } else { ?>
+                            <?php $rang = 1; ?>
+                            <?php foreach ($topProduitsFrigo as $item) { ?>
+                                <div class="frigo-top-card">
+                                    <div class="frigo-rank">#<?php echo $rang; ?></div>
+
+                                    <div class="health-product-name">
+                                        <?php echo htmlspecialchars($item['nom'] ?? 'Produit'); ?>
+                                    </div>
+
+                                    <div class="health-product-meta">
+                                        Présent <?php echo htmlspecialchars($item['total'] ?? 0); ?> fois dans les frigos
+                                    </div>
+                                </div>
+                                <?php $rang++; ?>
+                            <?php } ?>
+                        <?php } ?>
                     </div>
                 </div>
 
-                <div class="col-lg-4">
+                <div class="col-lg-7">
                     <div class="dashboard-chart-card">
-                        <div class="dashboard-chart-title">Bénéfices moyens par catégorie</div>
-                        <canvas id="chartBeneficesCategorie"></canvas>
-                    </div>
-                </div>
-
-                <div class="col-lg-4">
-                    <div class="dashboard-chart-card">
-                        <div class="dashboard-chart-title">Allergènes moyens par catégorie</div>
-                        <canvas id="chartAllergenesCategorie"></canvas>
+                        <div class="dashboard-chart-title">Catégories les plus présentes dans les frigos</div>
+                        <canvas id="chartCategoriesFrigo"></canvas>
                     </div>
                 </div>
             </div>
@@ -789,6 +830,9 @@ const chartCategoryAvgLabels = <?php echo json_encode($chartCategoryAvgLabels, J
 const chartCategoryAvgCalories = <?php echo json_encode($chartCategoryAvgCalories); ?>;
 const chartCategoryAvgBenefits = <?php echo json_encode($chartCategoryAvgBenefits); ?>;
 const chartCategoryAvgAllergenes = <?php echo json_encode($chartCategoryAvgAllergenes); ?>;
+
+const chartCategoriesFrigoLabels = <?php echo json_encode($chartCategoriesFrigoLabels, JSON_UNESCAPED_UNICODE); ?>;
+const chartCategoriesFrigoValues = <?php echo json_encode($chartCategoriesFrigoValues); ?>;
 
 const doughnutLabelPlugin = {
     id: 'doughnutLabelPlugin',
@@ -838,56 +882,25 @@ new Chart(document.getElementById('chartProduitsCategorie'), {
     }
 });
 
-new Chart(document.getElementById('chartCaloriesCategorie'), {
+new Chart(document.getElementById('chartCategoriesFrigo'), {
     type: 'bar',
     data: {
-        labels: chartCategoryAvgLabels,
+        labels: chartCategoriesFrigoLabels,
         datasets: [{
-            label: 'Calories moyennes',
-            data: chartCategoryAvgCalories,
-            backgroundColor: '#29b6f6'
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-
-new Chart(document.getElementById('chartBeneficesCategorie'), {
-    type: 'bar',
-    data: {
-        labels: chartCategoryAvgLabels,
-        datasets: [{
-            label: 'Bénéfices moyens',
-            data: chartCategoryAvgBenefits,
+            label: 'Présence dans les frigos',
+            data: chartCategoriesFrigoValues,
             backgroundColor: '#2f8b3a'
         }]
     },
     options: {
         responsive: true,
         scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-
-new Chart(document.getElementById('chartAllergenesCategorie'), {
-    type: 'bar',
-    data: {
-        labels: chartCategoryAvgLabels,
-        datasets: [{
-            label: 'Allergènes moyens',
-            data: chartCategoryAvgAllergenes,
-            backgroundColor: '#dc3545'
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true }
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    precision: 0
+                }
+            }
         }
     }
 });

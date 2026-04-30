@@ -416,6 +416,40 @@ class RecetteController
             'mise_en_avant' => $valeur,
             'id_recette' => $idRecette
         ]);
+   }
+public function updateCaloriesRecettesByProduit($idProduit)
+{
+    $db = Config::getConnexion();
+
+    $sql = "SELECT DISTINCT id_recette 
+            FROM recette_produit 
+            WHERE id_produit = :id_produit";
+
+    $query = $db->prepare($sql);
+    $query->execute(['id_produit' => $idProduit]);
+    $recettes = $query->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($recettes as $recette) {
+
+        $sqlTotal = "SELECT SUM(p.calories) AS total
+                     FROM recette_produit rp
+                     JOIN produit p ON rp.id_produit = p.id_produit
+                     WHERE rp.id_recette = :id_recette";
+
+        $q = $db->prepare($sqlTotal);
+        $q->execute(['id_recette' => $recette['id_recette']]);
+        $total = $q->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+        $sqlUpdate = "UPDATE recette 
+                      SET calories = :calories 
+                      WHERE id_recette = :id_recette";
+
+        $u = $db->prepare($sqlUpdate);
+        $u->execute([
+            'calories' => $total,
+            'id_recette' => $recette['id_recette']
+        ]);
     }
+}
 }
 ?>

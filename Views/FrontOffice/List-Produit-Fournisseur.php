@@ -24,6 +24,103 @@ $produits = $produitController->listProduitsByUtilisateur(
     $search,
     $idCategorie !== '' ? $idCategorie : null
 );
+if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
+
+    $produitsExport = $produits;
+
+    $titreExport = (!empty($search) || !empty($idCategorie))
+        ? 'Mes produits filtrés'
+        : 'Liste complète de mes produits';
+
+    $nomFichier = "HappyBite_Mes_Produits_" . date("Y-m-d_H-i") . ".xls";
+
+    $logoPath = realpath(__DIR__ . '/../assets/images/logo.png');
+    $logoPath = $logoPath ? str_replace("\\", "/", $logoPath) : '';
+
+    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
+    header("Content-Disposition: attachment; filename=\"$nomFichier\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    echo "\xEF\xBB\xBF";
+?>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+.brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
+.logo-cell { width: 120px; text-align: left; padding-left: 10px; }
+.title-cell { font-size: 26px; font-weight: bold; color: #1b5e20; letter-spacing: 1px; }
+.title { background-color: #e8f5e9; font-size: 20px; font-weight: bold; color: #2e7d32; text-align: center; border: 2px solid #2e7d32; }
+.subtitle { background-color: #f1f8e9; color: #666; text-align: center; font-size: 12px; }
+.header td { background-color: #2e7d32; color: white; font-weight: bold; text-align: center; border: 1px solid #1b5e20; }
+td { border: 1px solid #a5d6a7; padding: 7px; vertical-align: middle; }
+.center { text-align: center; }
+.promo-oui { background-color: #fff3cd; color: #856404; font-weight: bold; text-align: center; }
+.promo-non { background-color: #eeeeee; color: #555; text-align: center; }
+.prix-promo { background-color: #ffe082; color: #5d4037; font-weight: bold; text-align: center; }
+.allergene { background-color: #f8d7da; color: #842029; font-weight: bold; }
+</style>
+</head>
+
+<body>
+<table>
+<tr class="brand">
+    <td colspan="2" class="logo-cell">
+        <?php if (!empty($logoPath)) { ?>
+            <img src="file:///<?php echo $logoPath; ?>" width="70">
+        <?php } ?>
+    </td>
+    <td colspan="8" class="title-cell">HappyBite</td>
+</tr>
+
+<tr><td colspan="10" class="title"><?php echo $titreExport; ?></td></tr>
+<tr><td colspan="10" class="subtitle">Export généré le <?php echo date('d/m/Y à H:i'); ?></td></tr>
+
+<tr class="header">
+    <td>ID</td>
+    <td>Nom</td>
+    <td>Catégorie</td>
+    <td>Prix normal</td>
+    <td>Promo</td>
+    <td>Prix promo</td>
+    <td>Calories</td>
+    <td>Allergènes</td>
+    <td>Bénéfices</td>
+    <td>Date ajout</td>
+</tr>
+
+<?php foreach ($produitsExport as $produit) { ?>
+<?php
+$isPromo = isset($produit['promo']) && $produit['promo'] !== null && $produit['promo'] !== '';
+$hasAllergene = !empty($produit['allergene']) && strtolower(trim($produit['allergene'])) !== 'aucun';
+?>
+<tr>
+    <td class="center"><?php echo htmlspecialchars($produit['id_produit'] ?? ''); ?></td>
+    <td><strong><?php echo htmlspecialchars($produit['nom'] ?? ''); ?></strong></td>
+    <td class="center"><?php echo htmlspecialchars($produit['nom_categorie'] ?? 'Sans catégorie'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($produit['prix'] ?? ''); ?> DT</td>
+    <td class="<?php echo $isPromo ? 'promo-oui' : 'promo-non'; ?>"><?php echo $isPromo ? 'Oui' : 'Non'; ?></td>
+    <td class="<?php echo $isPromo ? 'prix-promo' : 'center'; ?>">
+        <?php echo $isPromo ? htmlspecialchars($produit['promo']) . ' DT' : '-'; ?>
+    </td>
+    <td class="center"><?php echo htmlspecialchars($produit['calories'] ?? 'Non défini'); ?></td>
+    <td class="<?php echo $hasAllergene ? 'allergene' : 'center'; ?>">
+        <?php echo htmlspecialchars($produit['allergene'] ?? 'Aucun'); ?>
+    </td>
+    <td><?php echo htmlspecialchars($produit['benefices'] ?? 'Non précisé'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($produit['date_ajout'] ?? ''); ?></td>
+</tr>
+<?php } ?>
+</table>
+</body>
+</html>
+
+<?php
+exit;
+}
 ?>
 
 <!DOCTYPE html>

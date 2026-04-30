@@ -1,7 +1,7 @@
 <?php
 require_once(__DIR__ . '/../Config.php');
 require_once(__DIR__ . '/../Models/Produit.php');
-
+require_once __DIR__ . '/RecetteController.php';
 class ProduitController
 {
     public function addProduit(Produit $produit)
@@ -152,6 +152,10 @@ class ProduitController
                 'id_categorie' => $produit->getIdCategorie(),
                 'id' => $id
             ]);
+            require_once(__DIR__ . '/RecetteController.php');
+            $recetteC = new RecetteController();
+            $recetteC->updateCaloriesRecettesByProduit($id);
+
             return true;
         } catch (Exception $e) {
             echo 'Erreur : ' . $e->getMessage();
@@ -535,37 +539,46 @@ class ProduitController
     }
 
     public function updateProduitByUtilisateur($produit, $idProduit, $idUtilisateur)
-    {
-        $sql = "UPDATE produit
-                SET nom = :nom,
-                    prix = :prix,
-                    promo = :promo,
-                    image = :image,
-                    allergene = :allergene,
-                    benefices = :benefices,
-                    calories = :calories,
-                    date_ajout = :date_ajout,
-                    id_categorie = :id_categorie
-                WHERE id_produit = :id_produit
-                AND id_utilisateur = :id_utilisateur";
+{
+    $sql = "UPDATE produit
+            SET nom = :nom,
+                prix = :prix,
+                promo = :promo,
+                image = :image,
+                allergene = :allergene,
+                benefices = :benefices,
+                calories = :calories,
+                date_ajout = :date_ajout,
+                id_categorie = :id_categorie
+            WHERE id_produit = :id_produit
+            AND id_utilisateur = :id_utilisateur";
 
-        $db = Config::getConnexion();
-        $query = $db->prepare($sql);
+    $db = Config::getConnexion();
+    $query = $db->prepare($sql);
 
-        return $query->execute([
-            'nom' => $produit->getNom(),
-            'prix' => $produit->getPrix(),
-            'promo' => $produit->getPromo(),
-            'image' => $produit->getImage(),
-            'allergene' => $produit->getAllergene(),
-            'benefices' => $produit->getBenefices(),
-            'calories' => $produit->getCalories(),
-            'date_ajout' => $produit->getDateAjout(),
-            'id_categorie' => $produit->getIdCategorie(),
-            'id_produit' => $idProduit,
-            'id_utilisateur' => $idUtilisateur
-        ]);
+    $result = $query->execute([
+        'nom' => $produit->getNom(),
+        'prix' => $produit->getPrix(),
+        'promo' => $produit->getPromo(),
+        'image' => $produit->getImage(),
+        'allergene' => $produit->getAllergene(),
+        'benefices' => $produit->getBenefices(),
+        'calories' => $produit->getCalories(),
+        'date_ajout' => $produit->getDateAjout(),
+        'id_categorie' => $produit->getIdCategorie(),
+        'id_produit' => $idProduit,
+        'id_utilisateur' => $idUtilisateur
+    ]);
+
+    // 🔥 Mise à jour automatique des recettes
+    if ($result) {
+        require_once(__DIR__ . '/RecetteController.php');
+        $recetteC = new RecetteController();
+        $recetteC->updateCaloriesRecettesByProduit($idProduit);
     }
+
+    return $result;
+}
 
     public function getProduitDetailsByIdAndUtilisateur($idProduit, $idUtilisateur)
     {

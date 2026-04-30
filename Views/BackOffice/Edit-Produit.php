@@ -217,6 +217,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         $produitController->updateProduit($produit, $id);
+        $recetteC = new RecetteController();
+$recetteC->updateCaloriesRecettesByProduit($id);
 
         header('Location: List-Produit.php');
         exit;

@@ -22,13 +22,19 @@ $idCategorie = trim($_GET['id_categorie'] ?? '');
 $categories = $categorieController->listCategories();
 
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
+
     if (!empty($motCle) || !empty($idCategorie)) {
         $produitsExport = $produitController->rechercherProduits($motCle, $idCategorie);
-        $nomFichier = 'produits_filtres.xls';
+        $titreExport = 'Liste des produits filtrés';
     } else {
         $produitsExport = $produitController->listProduits();
-        $nomFichier = 'produits.xls';
+        $titreExport = 'Liste complète des produits';
     }
+
+    $nomFichier = "HappyBite_Produits_" . date("Y-m-d_H-i") . ".xls";
+
+    $logoPath = realpath(__DIR__ . '/../assets/images/logo.png');
+    $logoPath = $logoPath ? str_replace("\\", "/", $logoPath) : '';
 
     header("Content-Type: application/vnd.ms-excel; charset=utf-8");
     header("Content-Disposition: attachment; filename=\"$nomFichier\"");
@@ -36,41 +42,85 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
     header("Expires: 0");
 
     echo "\xEF\xBB\xBF";
+?>
 
-    echo "<table border='1'>";
-    echo "<tr>";
-    echo "<th>ID</th>";
-    echo "<th>Nom</th>";
-    echo "<th>Fournisseur</th>";
-    echo "<th>Prix normal (DT)</th>";
-    echo "<th>Promo</th>";
-    echo "<th>Prix promo (DT)</th>";
-    echo "<th>Calories</th>";
-    echo "<th>Catégorie</th>";
-    echo "<th>Allergènes</th>";
-    echo "<th>Bénéfices</th>";
-    echo "<th>Date ajout</th>";
-    echo "</tr>";
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+.brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
+.logo-cell { width: 120px; text-align: left; padding-left: 10px; }
+.title-cell { font-size: 26px; font-weight: bold; color: #1b5e20; text-align: left; letter-spacing: 1px; }
+.title { background-color: #e8f5e9; font-size: 20px; font-weight: bold; color: #2e7d32; text-align: center; height: 40px; border: 2px solid #2e7d32; }
+.subtitle { background-color: #f1f8e9; color: #666; text-align: center; font-size: 12px; height: 28px; }
+.header td { background-color: #2e7d32; color: white; font-weight: bold; text-align: center; border: 1px solid #1b5e20; }
+td { border: 1px solid #a5d6a7; padding: 7px; vertical-align: middle; }
+.center { text-align: center; }
+.promo-oui { background-color: #fff3cd; color: #856404; font-weight: bold; text-align: center; }
+.promo-non { background-color: #eeeeee; color: #555; text-align: center; }
+.prix-promo { background-color: #ffe082; color: #5d4037; font-weight: bold; text-align: center; }
+.allergene { background-color: #f8d7da; color: #842029; font-weight: bold; }
+</style>
+</head>
 
-    foreach ($produitsExport as $produit) {
-        $isPromo = isset($produit['promo']) && $produit['promo'] !== null && $produit['promo'] !== '';
-        echo "<tr>";
-        echo "<td>" . htmlspecialchars($produit['id_produit'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['nom'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['nom_fournisseur'] ?? 'Non renseigné') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['prix'] ?? '') . "</td>";
-        echo "<td>" . ($isPromo ? 'Oui' : 'Non') . "</td>";
-        echo "<td>" . ($isPromo ? htmlspecialchars($produit['promo']) : '') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['calories'] ?? 'Non défini') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['nom_categorie'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['allergene'] ?? 'Aucun') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['benefices'] ?? 'Non précisé') . "</td>";
-        echo "<td>" . htmlspecialchars($produit['date_ajout'] ?? '') . "</td>";
-        echo "</tr>";
-    }
+<body>
+<table>
+<tr class="brand">
+    <td colspan="2" class="logo-cell">
+        <?php if (!empty($logoPath)) { ?>
+            <img src="file:///<?php echo $logoPath; ?>" width="70">
+        <?php } ?>
+    </td>
+    <td colspan="9" class="title-cell">HappyBite</td>
+</tr>
 
-    echo "</table>";
-    exit;
+<tr><td colspan="11" class="title"><?php echo $titreExport; ?></td></tr>
+<tr><td colspan="11" class="subtitle">Export généré le <?php echo date('d/m/Y à H:i'); ?></td></tr>
+
+<tr class="header">
+    <td>ID</td>
+    <td>Nom</td>
+    <td>Fournisseur</td>
+    <td>Prix normal</td>
+    <td>Promo</td>
+    <td>Prix promo</td>
+    <td>Calories</td>
+    <td>Catégorie</td>
+    <td>Allergènes</td>
+    <td>Bénéfices</td>
+    <td>Date ajout</td>
+</tr>
+
+<?php foreach ($produitsExport as $produit) { ?>
+<?php
+$isPromo = isset($produit['promo']) && $produit['promo'] !== null && $produit['promo'] !== '';
+$hasAllergene = !empty($produit['allergene']) && strtolower(trim($produit['allergene'])) !== 'aucun';
+?>
+<tr>
+    <td class="center"><?php echo htmlspecialchars($produit['id_produit'] ?? ''); ?></td>
+    <td><?php echo htmlspecialchars($produit['nom'] ?? ''); ?></td>
+    <td><?php echo htmlspecialchars($produit['nom_fournisseur'] ?? 'Non renseigné'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($produit['prix'] ?? ''); ?> DT</td>
+    <td class="<?php echo $isPromo ? 'promo-oui' : 'promo-non'; ?>"><?php echo $isPromo ? 'Oui' : 'Non'; ?></td>
+    <td class="<?php echo $isPromo ? 'prix-promo' : 'center'; ?>">
+        <?php echo $isPromo ? htmlspecialchars($produit['promo']) . ' DT' : '-'; ?>
+    </td>
+    <td class="center"><?php echo htmlspecialchars($produit['calories'] ?? 'Non défini'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($produit['nom_categorie'] ?? ''); ?></td>
+    <td class="<?php echo $hasAllergene ? 'allergene' : 'center'; ?>">
+        <?php echo htmlspecialchars($produit['allergene'] ?? 'Aucun'); ?>
+    </td>
+    <td><?php echo htmlspecialchars($produit['benefices'] ?? 'Non précisé'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($produit['date_ajout'] ?? ''); ?></td>
+</tr>
+<?php } ?>
+</table>
+</body>
+</html>
+
+<?php
+exit;
 }
 
 if (!empty($motCle) || !empty($idCategorie)) {

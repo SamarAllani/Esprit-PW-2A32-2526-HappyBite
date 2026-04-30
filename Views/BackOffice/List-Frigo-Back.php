@@ -17,9 +17,14 @@ $idUtilisateur = ctype_digit($recherche) ? $recherche : '';
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
     $frigosExport = $frigoController->getResumeFrigos($motCle, $idUtilisateur);
 
-    $nomFichier = !empty($recherche)
-        ? 'frigos_recherche.xls'
-        : 'frigos.xls';
+    $titreExport = !empty($recherche)
+        ? 'Liste des frigos filtrés'
+        : 'Liste complète des frigos';
+
+    $nomFichier = "HappyBite_Frigos_" . date("Y-m-d_H-i") . ".xls";
+
+    $logoPath = realpath(__DIR__ . '/../assets/images/logo.png');
+    $logoPath = $logoPath ? str_replace("\\", "/", $logoPath) : '';
 
     header("Content-Type: application/vnd.ms-excel; charset=utf-8");
     header("Content-Disposition: attachment; filename=\"$nomFichier\"");
@@ -27,30 +32,67 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
     header("Expires: 0");
 
     echo "\xEF\xBB\xBF";
+?>
 
-    echo "<table border='1'>";
-    echo "<tr>";
-    echo "<th>ID Utilisateur</th>";
-    echo "<th>Utilisateur</th>";
-    echo "<th>Nombre de produits</th>";
-    echo "<th>Quantité totale</th>";
-    echo "<th>Contenu du frigo</th>";
-    echo "<th>Dernier ajout</th>";
-    echo "</tr>";
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+.brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
+.logo-cell { width: 120px; text-align: left; padding-left: 10px; }
+.title-cell { font-size: 26px; font-weight: bold; color: #1b5e20; letter-spacing: 1px; }
+.title { background-color: #e8f5e9; font-size: 20px; font-weight: bold; color: #2e7d32; text-align: center; border: 2px solid #2e7d32; }
+.subtitle { background-color: #f1f8e9; color: #666; text-align: center; font-size: 12px; }
+.header td { background-color: #2e7d32; color: white; font-weight: bold; text-align: center; border: 1px solid #1b5e20; }
+td { border: 1px solid #a5d6a7; padding: 7px; vertical-align: middle; }
+.center { text-align: center; }
+.id-col { width: 120px; white-space: nowrap; }
+.user-col { width: 180px; white-space: nowrap; font-weight: bold; }
+.quantite { background-color: #ffe082; color: #5d4037; font-weight: bold; text-align: center; }
+.produits { background-color: #e8f5e9; color: #2e7d32; font-weight: bold; }
+</style>
+</head>
 
-    foreach ($frigosExport as $frigo) {
-        echo "<tr>";
-        echo "<td>" . htmlspecialchars($frigo['id_utilisateur'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($frigo['nom_utilisateur'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($frigo['nombre_produits'] ?? 0) . "</td>";
-        echo "<td>" . htmlspecialchars($frigo['quantite_totale'] ?? 0) . "</td>";
-        echo "<td>" . htmlspecialchars($frigo['liste_produits'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($frigo['derniere_date_ajout'] ?? '') . "</td>";
-        echo "</tr>";
-    }
+<body>
+<table>
+<tr class="brand">
+    <td colspan="2" class="logo-cell">
+        <?php if (!empty($logoPath)) { ?>
+            <img src="file:///<?php echo $logoPath; ?>" width="70">
+        <?php } ?>
+    </td>
+    <td colspan="4" class="title-cell">HappyBite</td>
+</tr>
 
-    echo "</table>";
-    exit;
+<tr><td colspan="6" class="title"><?php echo $titreExport; ?></td></tr>
+<tr><td colspan="6" class="subtitle">Export généré le <?php echo date('d/m/Y à H:i'); ?></td></tr>
+
+<tr class="header">
+    <td class="id-col">ID Utilisateur</td>
+    <td class="user-col">Utilisateur</td>
+    <td>Nombre de produits</td>
+    <td>Quantité totale</td>
+    <td>Contenu du frigo</td>
+    <td>Dernier ajout</td>
+</tr>
+
+<?php foreach ($frigosExport as $frigo) { ?>
+<tr>
+    <td class="id-col center"><?php echo htmlspecialchars($frigo['id_utilisateur'] ?? ''); ?></td>
+    <td class="user-col center"><?php echo htmlspecialchars($frigo['nom_utilisateur'] ?? ''); ?></td>
+    <td class="center"><?php echo htmlspecialchars($frigo['nombre_produits'] ?? 0); ?></td>
+    <td class="quantite"><?php echo htmlspecialchars($frigo['quantite_totale'] ?? 0); ?></td>
+    <td class="produits"><?php echo htmlspecialchars($frigo['liste_produits'] ?? 'Aucun produit'); ?></td>
+    <td class="center"><?php echo htmlspecialchars($frigo['derniere_date_ajout'] ?? ''); ?></td>
+</tr>
+<?php } ?>
+</table>
+</body>
+</html>
+
+<?php
+exit;
 }
 
 $frigos = $frigoController->getResumeFrigos($motCle, $idUtilisateur);
@@ -79,7 +121,7 @@ $frigos = $frigoController->getResumeFrigos($motCle, $idUtilisateur);
 
         <nav class="admin-main-menu">
             <a href="List-Produit.php" class="admin-main-link active">Produit</a>
-            <a href="#" class="admin-main-link">Communauté</a>
+            <a href="#" class="admin-main-link">Commande</a>
             <a href="#" class="admin-main-link">Post</a>
             <a href="#" class="admin-main-link">Utilisateur</a>
             <a href="#" class="admin-main-link">Santé</a>

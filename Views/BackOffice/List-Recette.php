@@ -25,13 +25,19 @@ $motCle = trim($_GET['motCle'] ?? '');
 | - Toutes les colonnes utiles sauf l'image
 */
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
+
     if (!empty($motCle)) {
         $recettesExport = $recetteController->rechercherRecettes($motCle);
-        $nomFichier = 'recettes_filtrees.xls';
+        $titreExport = 'Liste des recettes filtrées';
     } else {
         $recettesExport = $recetteController->listRecettes();
-        $nomFichier = 'recettes.xls';
+        $titreExport = 'Liste complète des recettes';
     }
+
+    $nomFichier = "HappyBite_Recettes_" . date("Y-m-d_H-i") . ".xls";
+
+    $logoPath = realpath(__DIR__ . '/../assets/images/logo.png');
+    $logoPath = $logoPath ? str_replace("\\", "/", $logoPath) : '';
 
     header("Content-Type: application/vnd.ms-excel; charset=utf-8");
     header("Content-Disposition: attachment; filename=\"$nomFichier\"");
@@ -39,37 +45,86 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == '1') {
     header("Expires: 0");
 
     echo "\xEF\xBB\xBF";
+?>
 
-    echo "<table border='1'>";
-    echo "<tr>";
-    echo "<th>ID</th>";
-    echo "<th>Nom</th>";
-    echo "<th>Calories</th>";
-    echo "<th>Produits</th>";
-    echo "</tr>";
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+table { border-collapse: collapse; width: 100%; font-family: Arial; font-size: 12px; }
+.brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
+.logo-cell { width: 120px; padding-left: 10px; }
+.title-cell { font-size: 26px; font-weight: bold; color: #1b5e20; }
+.title { background-color: #e8f5e9; font-size: 20px; font-weight: bold; color: #2e7d32; text-align: center; border: 2px solid #2e7d32; }
+.subtitle { background-color: #f1f8e9; color: #666; text-align: center; font-size: 12px; }
+.header td { background-color: #2e7d32; color: white; font-weight: bold; text-align: center; }
+td { border: 1px solid #a5d6a7; padding: 7px; }
+.center { text-align: center; }
+.nom-col { width: 220px; font-weight: bold; }
+.produits { background-color: #e8f5e9; color: #2e7d32; font-weight: bold; }
+.cal-high { background-color: #f8d7da; color: #842029; font-weight: bold; text-align: center; }
+.cal-medium { background-color: #fff3cd; color: #856404; text-align: center; }
+.cal-low { background-color: #e8f5e9; color: #2e7d32; text-align: center; }
+</style>
+</head>
 
-    foreach ($recettesExport as $recette) {
-        $produitsRecette = $recetteController->getProduitsByRecette($recette['id_recette']);
-        $nomsProduits = [];
+<body>
+<table>
+<tr class="brand">
+    <td colspan="2" class="logo-cell">
+        <?php if (!empty($logoPath)) { ?>
+            <img src="file:///<?php echo $logoPath; ?>" width="70">
+        <?php } ?>
+    </td>
+    <td colspan="2" class="title-cell">HappyBite</td>
+</tr>
 
-        if (!empty($produitsRecette)) {
-            foreach ($produitsRecette as $produit) {
-                $nomsProduits[] = $produit['nom'];
-            }
+<tr><td colspan="4" class="title"><?php echo $titreExport; ?></td></tr>
+<tr><td colspan="4" class="subtitle">Export généré le <?php echo date('d/m/Y à H:i'); ?></td></tr>
+
+<tr class="header">
+    <td>ID</td>
+    <td>Nom</td>
+    <td>Calories</td>
+    <td>Produits</td>
+</tr>
+
+<?php foreach ($recettesExport as $recette) {
+    $produitsRecette = $recetteController->getProduitsByRecette($recette['id_recette']);
+    $nomsProduits = [];
+
+    if (!empty($produitsRecette)) {
+        foreach ($produitsRecette as $produit) {
+            $nomsProduits[] = $produit['nom'];
         }
-
-        echo "<tr>";
-        echo "<td>" . htmlspecialchars($recette['id_recette'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($recette['nom'] ?? '') . "</td>";
-        echo "<td>" . htmlspecialchars($recette['calories'] ?? 0) . "</td>";
-        echo "<td>" . htmlspecialchars(!empty($nomsProduits) ? implode(', ', $nomsProduits) : 'Aucun produit') . "</td>";
-        echo "</tr>";
     }
 
-    echo "</table>";
-    exit;
-}
+    $cal = intval($recette['calories'] ?? 0);
 
+    if ($cal > 500) {
+        $calClass = 'cal-high';
+    } elseif ($cal > 300) {
+        $calClass = 'cal-medium';
+    } else {
+        $calClass = 'cal-low';
+    }
+?>
+<tr>
+    <td class="center"><?php echo htmlspecialchars($recette['id_recette']); ?></td>
+    <td class="nom-col"><?php echo htmlspecialchars($recette['nom']); ?></td>
+    <td class="<?php echo $calClass; ?>"><?php echo $cal; ?> cal</td>
+    <td class="produits">
+        <?php echo !empty($nomsProduits) ? htmlspecialchars(implode(', ', $nomsProduits)) : 'Aucun produit'; ?>
+    </td>
+</tr>
+<?php } ?>
+</table>
+</body>
+</html>
+
+<?php
+exit;
+}
 if (!empty($motCle)) {
     $recettes = $recetteController->rechercherRecettes($motCle);
 } else {

@@ -308,5 +308,44 @@ public function getDetailFrigoByUtilisateur($idUtilisateur)
         return [];
     }
 }
+public function getTopProduitsFrigo()
+{
+    $sql = "SELECT p.nom, COUNT(f.id_produit) AS total
+            FROM frigo f
+            INNER JOIN produit p ON f.id_produit = p.id_produit
+            GROUP BY f.id_produit, p.nom
+            ORDER BY total DESC
+            LIMIT 3";
+
+    $db = config::getConnexion();
+
+    try {
+        $query = $db->prepare($sql);
+        $query->execute();
+        return $query->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        die('Erreur: ' . $e->getMessage());
+    }
+}
+
+public function getCategoriesLesPlusPresentes()
+{
+    $sql = "SELECT c.nom AS nom_categorie, COUNT(f.id_produit) AS total
+            FROM frigo f
+            INNER JOIN produit p ON f.id_produit = p.id_produit
+            INNER JOIN categorie c ON p.id_categorie = c.id_categorie
+            GROUP BY c.id_categorie, c.nom
+            ORDER BY total DESC";
+
+    $db = config::getConnexion();
+
+    try {
+        $query = $db->prepare($sql);
+        $query->execute();
+        return $query->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        die('Erreur: ' . $e->getMessage());
+    }
+}
 }
 ?>
