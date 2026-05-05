@@ -263,17 +263,8 @@
                 .trim();
         }
 
-        function getAiReply(questionRaw) {
+        function getLocalFallbackReply(questionRaw) {
             var question = normalizeQuestion(questionRaw);
-            if (question === 'paypal est-il securise' || question === 'paypal est il securise' || question === 'payement avec carte est-il securise' || question === 'payement avec carte est il securise' || question === 'paiement avec carte est-il securise' || question === 'paiement avec carte est il securise') {
-                return 'Bien sûr, tout est en sécurité';
-            }
-            if (question === 'est-il possible d’annuler ma commande' || question === "est-il possible d'annuler ma commande" || question === 'est il possible d’annuler ma commande' || question === "est il possible d'annuler ma commande") {
-                return 'Bien sûr, il vous suffit de cliquer sur « Annuler » et votre commande sera annulée.';
-            }
-            if (question === 'quel mode de paiement dois-je choisir' || question === 'quel mode de paiement dois je choisir') {
-                return 'Si vous avez un compte PayPal, choisissez PayPal. Si vous avez une carte bancaire, choisissez Carte. Sinon, vous pouvez payer en espèces.';
-            }
             if (
                 question === 'ou est ma commande' ||
                 question === 'quand ma commande arrivera-t-elle' ||
@@ -283,11 +274,11 @@
                 question === 'when will my order arrive'
             ) {
                 if (currentPage !== 'commande.php') {
-                    return 'Voici où se trouve votre commande : <a href="track.php">Suivre ma commande</a>';
+                    return { answer: 'Voici où se trouve votre commande :', link: { url: 'track.php', label: 'Suivre ma commande' } };
                 }
-                return 'Finalisez d\'abord votre commande, puis utilisez ce lien : <a href="track.php">Suivre ma commande</a>';
+                return { answer: 'Finalisez d\'abord votre commande, puis utilisez ce lien :', link: { url: 'track.php', label: 'Suivre ma commande' } };
             }
-            return 'Je suis là pour vous aider.';
+            return { answer: 'Je suis la pour vous aider.' };
         }
 
         function appendUserMessage(text) {
@@ -299,7 +290,7 @@
             messages.scrollTop = messages.scrollHeight;
         }
 
-        function appendAiMessage(text) {
+        function appendAiMessage(payload) {
             if (!messages) return;
             var row = document.createElement('div');
             row.className = 'fo-ai-widget__msg-ai';
@@ -311,7 +302,17 @@
 
             var bubble = document.createElement('div');
             bubble.className = 'fo-ai-widget__msg-ai-bubble';
-            bubble.innerHTML = text;
+            var answerText = (payload && typeof payload.answer === 'string') ? payload.answer : '';
+            bubble.textContent = answerText;
+            if (payload && payload.link && payload.link.url && payload.link.label) {
+                var link = document.createElement('a');
+                link.href = String(payload.link.url);
+                link.textContent = String(payload.link.label);
+                link.style.marginLeft = '6px';
+                link.style.fontWeight = '700';
+                bubble.appendChild(document.createTextNode(' '));
+                bubble.appendChild(link);
+            }
 
             row.appendChild(icon);
             row.appendChild(bubble);
@@ -350,14 +351,46 @@
             });
         }
 
+        function requestAiReply(questionRaw) {
+            return fetch('ai_chat.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    question: questionRaw,
+                    page: currentPage
+                })
+            }).then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            });
+        }
+
         function sendCurrentMessage() {
             if (!input) return;
             var value = input.value.trim();
             if (value === '') return;
             appendUserMessage(value);
-            appendAiMessage(getAiReply(value));
+            if (sendBtn) sendBtn.disabled = true;
             input.value = '';
-            input.focus();
+            requestAiReply(value)
+                .then(function (data) {
+                    if (data && data.answer) {
+                        appendAiMessage(data);
+                    } else {
+                        appendAiMessage(getLocalFallbackReply(value));
+                    }
+                })
+                .catch(function () {
+                    appendAiMessage(getLocalFallbackReply(value));
+                })
+                .finally(function () {
+                    if (sendBtn) sendBtn.disabled = false;
+                    input.focus();
+                });
         }
 
         renderSuggestions();

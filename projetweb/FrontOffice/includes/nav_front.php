@@ -13,6 +13,18 @@ $nav_icon_class = static function (string $key, string $current): string {
     return $key === $current ? ' nav-icon-active' : '';
 };
 ?>
+<style>
+        /* Hover des liens texte (Accueil, Produits, …) — main-nav */
+        .main-nav .nav-link:hover {
+            color: var(--hb-forest-mid);
+            border-bottom-color: rgba(37, 107, 45, 0.4);
+        }
+
+        .main-nav .nav-link.nav-link-active:hover {
+            color: var(--hb-forest-mid);
+            border-bottom-color: var(--hb-forest);
+        }
+</style>
 <nav class="main-nav">
     <a class="nav-brand" href="Home.php" aria-label="HappyBite — accueil">
         <img class="nav-brand-logo" src="images/logo.png" alt="" width="76" height="76">
@@ -22,7 +34,7 @@ $nav_icon_class = static function (string $key, string $current): string {
             <a href="Home.php" class="nav-link<?php echo $nav_class('accueil', $nav_active); ?>">Accueil</a>
             <a href="List-Produit.php" class="nav-link<?php echo $nav_class('produits', $nav_active); ?>">Produits</a>
             <a href="List-Recette.php" class="nav-link<?php echo $nav_class('recettes', $nav_active); ?>">Recettes</a>
-            <a href="#" class="nav-link<?php echo $nav_class('communaute', $nav_active); ?>">Communauté</a>
+            <a href="communaute.php" class="nav-link<?php echo $nav_class('communaute', $nav_active); ?>">Communauté</a>
         </div>
     </div>
     <div class="nav-icons">

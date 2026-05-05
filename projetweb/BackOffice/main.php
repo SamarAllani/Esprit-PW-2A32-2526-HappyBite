@@ -37,10 +37,11 @@ $logoSrc = is_file(dirname(__DIR__) . '/images/logo.png')
             <img src="<?php echo htmlspecialchars($logoSrc); ?>" alt="" class="bo-sidebar-logo" width="100" height="100">
         </a>
         <nav class="bo-sidebar-nav">
+            <a href="main.php?page=utilisateur" class="bo-sidebar-link<?php echo $active === 'utilisateur' ? ' is-active' : ''; ?>" target="_self">Utilisateur</a>
             <a href="main.php?page=produits" class="bo-sidebar-link<?php echo $active === 'produits' ? ' is-active' : ''; ?>" target="_self">Produits</a>
-            <a href="main.php?page=categories" class="bo-sidebar-link<?php echo $active === 'categories' ? ' is-active' : ''; ?>" target="_self">Categories</a>
-            <a href="main.php?page=recettes" class="bo-sidebar-link<?php echo $active === 'recettes' ? ' is-active' : ''; ?>" target="_self">Recettes</a>
-            <a href="main.php?page=commandes" class="bo-sidebar-link<?php echo $active === 'commandes' ? ' is-active' : ''; ?>" target="_self">Commande &amp; livraison</a>
+            <a href="main.php?page=commandes" class="bo-sidebar-link<?php echo $active === 'commandes' ? ' is-active' : ''; ?>" target="_self">Commande</a>
+            <a href="main.php?page=post" class="bo-sidebar-link<?php echo $active === 'post' ? ' is-active' : ''; ?>" target="_self">Post</a>
+            <a href="main.php?page=sante" class="bo-sidebar-link<?php echo $active === 'sante' ? ' is-active' : ''; ?>" target="_self">Santé</a>
         </nav>
     </aside>
     <main class="bo-main-frame-wrap">

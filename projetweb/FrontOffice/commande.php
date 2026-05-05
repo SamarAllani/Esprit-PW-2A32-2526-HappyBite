@@ -63,8 +63,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['terminer_commande']))
     }
     $redStr = str_replace(',', '.', trim((string) ($_POST['reduction'] ?? '0')));
     $reduction = is_numeric($redStr) ? (float) $redStr : 0.0;
+    $paypalVerified = (string) ($_POST['paypal_verified'] ?? '0') === '1';
+
+    if ($mode === 'paypal' && !$paypalVerified) {
+        $_SESSION['flash_erreur_commande'] = 'Veuillez terminer la connexion PayPal avant de finaliser.';
+        header('Location: commande.php');
+        exit;
+    }
 
     $commandeCtrl->finaliserCommande($idCmd, $mode, $reduction);
+    if ($mode === 'paypal') {
+        $_SESSION['flash_paypal_complete'] = 'Paiement avec PayPal complete.';
+    }
     panier_clear();
     header('Location: livraison.php');
     exit;
@@ -111,7 +121,6 @@ require __DIR__ . '/includes/nav_front.php';
         <?php if ($flashErreur !== '') { ?>
             <p class="commande-flash-erreur"><?php echo htmlspecialchars($flashErreur); ?></p>
         <?php } ?>
-
         <form method="post" action="commande.php" id="form-commande">
             <div class="commande-field">
                 <label for="produit">Produit</label>
@@ -170,17 +179,12 @@ require __DIR__ . '/includes/nav_front.php';
                     </div>
                 </div>
                 <div id="paypal-paiement-details" class="mode-paiement-details" hidden>
-                    <p class="mode-paiement-hint">Saisie locale uniquement — non enregistrée en base.</p>
-                    <div class="commande-field commande-field--nested">
-                        <label for="paypal-email">E-mail du compte PayPal</label>
-                        <input type="email" id="paypal-email" autocomplete="off" placeholder="vous@exemple.com">
-                    </div>
-                    <div class="commande-field commande-field--nested">
-                        <label for="paypal-nom">Nom affiché sur PayPal</label>
-                        <input type="text" id="paypal-nom" autocomplete="off" placeholder="Nom du compte">
-                    </div>
+                    <p class="mode-paiement-hint">Cliquez pour payer avec PayPal. Une fenetre login / Face ID va s'ouvrir.</p>
+                    <button type="button" id="paypal-auth-btn" class="paypal-auth-btn">Payer avec PayPal</button>
+                    <p id="paypal-status" class="paypal-status" hidden>Paiement PayPal complete. Vous pouvez maintenant cliquer sur "Terminer".</p>
                 </div>
             </div>
+            <input type="hidden" name="paypal_verified" id="paypal-verified" value="0">
             <div class="commande-actions">
                 <a href="commande.php?annuler=1" class="btn-commande-outline">Annuler</a>
                 <button type="submit" name="terminer_commande" value="1" class="btn-commande-primary">Terminer</button>
@@ -188,6 +192,26 @@ require __DIR__ . '/includes/nav_front.php';
         </form>
     </section>
 </main>
+
+<div id="paypal-modal" class="paypal-modal" hidden aria-hidden="true">
+    <div class="paypal-modal__panel" role="dialog" aria-modal="true" aria-labelledby="paypal-modal-title">
+        <h2 id="paypal-modal-title" class="paypal-modal__title">Connexion PayPal</h2>
+        <div class="paypal-modal__row">
+            <label for="paypal-login-email">Email</label>
+            <input type="email" id="paypal-login-email" placeholder="email@paypal.com">
+        </div>
+        <div class="paypal-modal__row">
+            <label for="paypal-login-password">Mot de passe</label>
+            <input type="password" id="paypal-login-password" placeholder="Mot de passe">
+        </div>
+        <div class="paypal-modal__actions">
+            <button type="button" id="paypal-login-submit" class="paypal-modal__btn paypal-modal__btn--login">Se connecter et payer</button>
+            <button type="button" id="paypal-faceid-submit" class="paypal-modal__btn paypal-modal__btn--faceid">Utiliser Face ID</button>
+            <button type="button" id="paypal-login-cancel" class="paypal-modal__btn paypal-modal__btn--cancel">Annuler</button>
+        </div>
+        <p id="paypal-modal-msg" class="paypal-modal__msg" hidden></p>
+    </div>
+</div>
 
 <footer>
     © 2026 HappyBite

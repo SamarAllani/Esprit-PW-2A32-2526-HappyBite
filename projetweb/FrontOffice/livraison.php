@@ -62,6 +62,8 @@ if ($dt instanceof DateTimeImmutable) {
     $dateAffiche = $dt->format('d/m/Y');
 }
 $statutAffiche = (string) $livraison['statut'];
+$paypalFlash = (string) ($_SESSION['flash_paypal_complete'] ?? '');
+unset($_SESSION['flash_paypal_complete']);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -83,6 +85,9 @@ require __DIR__ . '/includes/nav_front.php';
 
 <main class="commande-wrap">
     <section class="commande-panel livraison-panel" aria-label="Livraison">
+        <?php if ($paypalFlash !== '') { ?>
+            <p class="commande-flash-erreur" style="background:#e8f5e9;border-color:#2c7e34;color:#1b5e20;"><?php echo htmlspecialchars($paypalFlash); ?></p>
+        <?php } ?>
         <div class="livraison-hero">
             <h1 class="livraison-title">Commande confirmée !</h1>
             <img class="livraison-success-icon" src="images/success.svg" alt="" width="60" height="60">

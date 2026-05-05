@@ -374,6 +374,73 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
                 object-fit: contain;
                 display: block;
             }
+            .bo-table-actions {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .bo-table-btn {
+                display: inline-block;
+                padding: 6px 10px;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                text-decoration: none;
+                line-height: 1.2;
+                border: 1px solid transparent;
+                transition: filter 0.2s ease, transform 0.1s ease;
+            }
+            .bo-table-btn:hover {
+                filter: brightness(0.96);
+            }
+            .bo-table-btn:active {
+                transform: translateY(1px);
+            }
+            .bo-table-btn--edit {
+                background: #facc15;
+                border-color: #eab308;
+                color: #1f2937;
+            }
+            .bo-table-btn--delete {
+                background: #ef4444;
+                border-color: #dc2626;
+                color: #fff;
+            }
+            .bo-table-scroll {
+                overflow: visible;
+            }
+            .bo-table-pager {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 10px;
+                margin-top: 10px;
+                flex-wrap: wrap;
+            }
+            .bo-pager-arrow {
+                width: 36px;
+                height: 36px;
+                border-radius: 999px;
+                border: 2px solid #2c7e34;
+                background: #e8f5e9;
+                color: #1f6b31;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 900;
+                line-height: 1;
+            }
+            .bo-pager-arrow[disabled] {
+                opacity: 0.45;
+                cursor: not-allowed;
+            }
+            .bo-pager-info {
+                font-weight: 700;
+                color: #1f3a28;
+                font-size: 13px;
+            }
         </style>
 
         <?php if ($commandeEdition !== null) { ?>
@@ -644,13 +711,9 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
                                         <td class="bo-td-center"><?php echo htmlspecialchars(number_format((float) ($c['reduction'] ?? 0), 2, ',', ' ')); ?></td>
                                         <td class="bo-td-center"><?php echo $c['id_livraison'] !== null && $c['id_livraison'] !== '' ? (int) $c['id_livraison'] : '—'; ?></td>
                                         <td class="bo-td-center">
-                                            <span class="bo-icon-actions">
-                                                <a href="Edit-commande.php?id=<?php echo $idC; ?>" title="Modifier" aria-label="Modifier">
-                                                    <img src="<?php echo htmlspecialchars($imgModify); ?>" alt="" width="24" height="24">
-                                                </a>
-                                                <a href="list-com-liv.php?supprimer_commande=<?php echo $idC; ?>&vue=commande" title="Supprimer" aria-label="Supprimer">
-                                                    <img src="<?php echo htmlspecialchars($imgDelete); ?>" alt="" width="24" height="24">
-                                                </a>
+                                            <span class="bo-table-actions">
+                                                <a class="bo-table-btn bo-table-btn--edit" href="Edit-commande.php?id=<?php echo $idC; ?>" title="Modifier" aria-label="Modifier">Modifier</a>
+                                                <a class="bo-table-btn bo-table-btn--delete" href="list-com-liv.php?supprimer_commande=<?php echo $idC; ?>&vue=commande" title="Supprimer" aria-label="Supprimer">Supprimer</a>
                                             </span>
                                         </td>
                                     </tr>
@@ -658,6 +721,11 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
                             <?php } ?>
                         </tbody>
                     </table>
+                </div>
+                <div class="bo-table-pager" data-table-pager="commande" aria-label="Pagination commandes">
+                    <button type="button" class="bo-pager-arrow" data-pager-prev aria-label="Précédent">‹</button>
+                    <span class="bo-pager-info" data-pager-info>Page 1</span>
+                    <button type="button" class="bo-pager-arrow" data-pager-next aria-label="Suivant">›</button>
                 </div>
             </div>
 
@@ -707,13 +775,9 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
                                             </span>
                                         </td>
                                         <td class="bo-td-center">
-                                            <span class="bo-icon-actions">
-                                                <a href="Edit-livraison.php?id=<?php echo $idL; ?>" title="Modifier" aria-label="Modifier">
-                                                    <img src="<?php echo htmlspecialchars($imgModify); ?>" alt="" width="24" height="24">
-                                                </a>
-                                                <a href="list-com-liv.php?supprimer_livraison=<?php echo $idL; ?>&vue=livraison" title="Supprimer" aria-label="Supprimer">
-                                                    <img src="<?php echo htmlspecialchars($imgDelete); ?>" alt="" width="24" height="24">
-                                                </a>
+                                            <span class="bo-table-actions">
+                                                <a class="bo-table-btn bo-table-btn--edit" href="Edit-livraison.php?id=<?php echo $idL; ?>" title="Modifier" aria-label="Modifier">Modifier</a>
+                                                <a class="bo-table-btn bo-table-btn--delete" href="list-com-liv.php?supprimer_livraison=<?php echo $idL; ?>&vue=livraison" title="Supprimer" aria-label="Supprimer">Supprimer</a>
                                             </span>
                                         </td>
                                     </tr>
@@ -721,6 +785,11 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
                             <?php } ?>
                         </tbody>
                     </table>
+                </div>
+                <div class="bo-table-pager" data-table-pager="livraison" aria-label="Pagination livraisons">
+                    <button type="button" class="bo-pager-arrow" data-pager-prev aria-label="Précédent">‹</button>
+                    <span class="bo-pager-info" data-pager-info>Page 1</span>
+                    <button type="button" class="bo-pager-arrow" data-pager-next aria-label="Suivant">›</button>
                 </div>
             </div>
         </section>
@@ -944,6 +1013,62 @@ $imgSwap = is_file(__DIR__ . '/images/swap.png') ? 'images/swap.png' : '';
     } else {
         setMode(vueInit === 'livraison' ? 'livraison' : 'commande');
     }
+
+    function setupPager(root, rowsPerPage) {
+        if (!root) return;
+        var table = root.querySelector('table');
+        if (!table) return;
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+        var pager = root.querySelector('.bo-table-pager');
+        if (!pager) return;
+        var prev = pager.querySelector('[data-pager-prev]');
+        var next = pager.querySelector('[data-pager-next]');
+        var info = pager.querySelector('[data-pager-info]');
+        if (!prev || !next || !info) return;
+
+        // ignore empty-state single row (colspan + .bo-empty)
+        if (rows.length === 1 && rows[0].querySelector('.bo-empty')) {
+            pager.hidden = true;
+            return;
+        }
+
+        var page = 1;
+        var totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+
+        function render() {
+            totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+            if (page > totalPages) page = totalPages;
+            var start = (page - 1) * rowsPerPage;
+            var end = start + rowsPerPage;
+            rows.forEach(function (row, idx) {
+                row.hidden = !(idx >= start && idx < end);
+            });
+            info.textContent = 'Page ' + page + ' / ' + totalPages;
+            prev.disabled = page <= 1;
+            next.disabled = page >= totalPages;
+        }
+
+        prev.addEventListener('click', function () {
+            if (page > 1) {
+                page--;
+                render();
+            }
+        });
+        next.addEventListener('click', function () {
+            if (page < totalPages) {
+                page++;
+                render();
+            }
+        });
+
+        render();
+    }
+
+    setupPager(wrapC, 8);
+    setupPager(wrapL, 10);
 })();
 </script>
 <script src="js/controles.js" defer></script>

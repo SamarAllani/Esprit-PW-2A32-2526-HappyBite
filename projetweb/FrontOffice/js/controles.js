@@ -23,8 +23,7 @@
             cashMontant: 'cash-montant',
             cashContact: 'cash-contact',
             cashNote: 'cash-note',
-            paypalEmail: 'paypal-email',
-            paypalNom: 'paypal-nom'
+            paypalVerified: 'paypal-verified'
         };
     }
 
@@ -51,6 +50,12 @@
         sel.addEventListener('change', function () {
             clearPanelErrors();
             hideFormMessage(form);
+            if (sel.value !== 'paypal') {
+                var verified = document.getElementById('paypal-verified');
+                var status = document.getElementById('paypal-status');
+                if (verified) verified.value = '0';
+                if (status) status.hidden = true;
+            }
         });
     }
 
@@ -118,7 +123,7 @@
         var I = ids();
         [
             I.carteTitulaire, I.carteNumero, I.carteExpiration, I.carteCvv,
-            I.cashMontant, I.cashContact, I.cashNote, I.paypalEmail, I.paypalNom
+            I.cashMontant, I.cashContact, I.cashNote
         ].forEach(function (id) {
             clearClassErr(document.getElementById(id));
         });
@@ -201,19 +206,9 @@
                 return 'Pour le paiement cash : remplissez tous les champs (montant, téléphone valide 8+ caractères et note min. 2 caractères).';
             }
         } else if (mode === 'paypal') {
-            var em = document.getElementById(I.paypalEmail);
-            var nom = document.getElementById(I.paypalNom);
-            var okP = true;
-            if (!em || !isValidEmailLoose(em.value)) {
-                setClassErr(em);
-                okP = false;
-            }
-            if (!nom || nom.value.trim().length < 2) {
-                setClassErr(nom);
-                okP = false;
-            }
-            if (!okP) {
-                return 'Pour PayPal : remplissez tous les champs avec un e-mail valide et un nom d’au moins 2 caractères.';
+            var ver = document.getElementById(I.paypalVerified);
+            if (!ver || ver.value !== '1') {
+                return 'Pour PayPal : connectez-vous via le bouton "Se connecter a PayPal" (ou Face ID), puis finalisez.';
             }
         }
 
@@ -246,9 +241,7 @@
                 id === 'carte-titulaire' ||
                 id === 'cash-montant' ||
                 id === 'cash-contact' ||
-                id === 'cash-note' ||
-                id === 'paypal-email' ||
-                id === 'paypal-nom'
+                id === 'cash-note'
             ) {
                 clearClassErr(t);
             }
@@ -277,6 +270,71 @@
         });
     }
 
+    function bindPaypalModal() {
+        var modal = document.getElementById('paypal-modal');
+        var openBtn = document.getElementById('paypal-auth-btn');
+        var cancelBtn = document.getElementById('paypal-login-cancel');
+        var loginBtn = document.getElementById('paypal-login-submit');
+        var faceBtn = document.getElementById('paypal-faceid-submit');
+        var loginEmail = document.getElementById('paypal-login-email');
+        var loginPass = document.getElementById('paypal-login-password');
+        var verified = document.getElementById('paypal-verified');
+        var status = document.getElementById('paypal-status');
+        var msg = document.getElementById('paypal-modal-msg');
+        var selectMode = document.getElementById('mode-paiement');
+
+        if (!modal || !openBtn || !cancelBtn || !loginBtn || !faceBtn || !verified || !status || !msg || !selectMode) return;
+
+        function openModal() {
+            if (selectMode.value !== 'paypal') return;
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            msg.hidden = true;
+            msg.textContent = '';
+            if (loginEmail) loginEmail.focus();
+        }
+
+        function closeModal() {
+            modal.hidden = true;
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function setSuccess(emailValue, nameValue) {
+            verified.value = '1';
+            status.hidden = false;
+            closeModal();
+        }
+
+        openBtn.addEventListener('click', openModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) closeModal();
+        });
+
+        loginBtn.addEventListener('click', function () {
+            var em = loginEmail ? loginEmail.value.trim() : '';
+            var pw = loginPass ? loginPass.value.trim() : '';
+            if (!isValidEmailLoose(em) || pw.length < 4) {
+                msg.hidden = false;
+                msg.textContent = 'Entrez un email valide et un mot de passe.';
+                return;
+            }
+            msg.hidden = false;
+            msg.textContent = 'Connexion PayPal... paiement en cours...';
+            setTimeout(function () {
+                setSuccess(em, em.split('@')[0] || 'Compte PayPal');
+            }, 900);
+        });
+
+        faceBtn.addEventListener('click', function () {
+            msg.hidden = false;
+            msg.textContent = 'Authentification Face ID...';
+            setTimeout(function () {
+                setSuccess('client@paypal.com', 'Utilisateur Face ID');
+            }, 900);
+        });
+    }
+
     function run() {
         var form = document.getElementById('form-commande');
         if (!form) return;
@@ -285,6 +343,7 @@
         bindModePaiementChange(form);
         bindFormCommandeDelegated(form);
         bindCommandeSubmit(form);
+        bindPaypalModal();
     }
 
     if (document.readyState === 'loading') {
