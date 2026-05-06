@@ -15,21 +15,16 @@ if (!empty($search)) {
 
 $pieStats = $controller->getStatsProfilsVsNon();
 
-
 function formatList($data) {
     if (empty($data)) return [];
 
-    // déjà array
     if (is_array($data)) return $data;
 
-    // JSON array string
     $decoded = json_decode($data, true);
     if (is_array($decoded)) return $decoded;
 
-    // string simple "a,b,c"
     return explode(',', $data);
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -73,8 +68,24 @@ function formatList($data) {
 
 <div class="content">
 
-    <!-- SEARCH -->
-    <div class="search-container">
+    
+
+    <!-- CHART -->
+    <div class="card chart-card">
+        <h3>Répartition des utilisateurs</h3>
+
+        <div class="chart-container">
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+
+        <a href="export_users_pdf.php?search=<?= urlencode($search ?? '') ?>" class="pdf-btn">
+            📄 Export PDF
+        </a>
+   <div class="search-container">
         <form method="GET" class="search-form">
             <input type="text" name="search"
                    placeholder="Rechercher (nom, email, ID)"
@@ -83,22 +94,6 @@ function formatList($data) {
             <button type="submit">Rechercher</button>
         </form>
     </div>
-
-    <!-- CHART -->
-    <div class="card chart-card">
-
-        <h3>Répartition des utilisateurs</h3>
-       
- 
-
-        <canvas id="pieChart"></canvas>
-    </div>
-
-    <!-- TABLE -->
-    <div class="card">
-         <a href="export_users_pdf.php?search=<?= urlencode($search ?? '') ?>" 
-   class="pdf-btn">
-    📄 Export PDF</a> 
         <h2>Profil santé des utilisateurs</h2>
 
         <table>
@@ -122,8 +117,11 @@ function formatList($data) {
             <?php if (!empty($users)): ?>
                 <?php foreach ($users as $user): ?>
                     <tr>
-                        <td><?= htmlspecialchars($user['id']) ?></td>
 
+                        <!-- ID PROFIL -->
+                        <td><?= htmlspecialchars($user['id_profil_sante'] ?? '') ?></td>
+
+                        <!-- NOM -->
                         <td>
                             <?= htmlspecialchars($user['prenom'] . ' ' . $user['nom']) ?>
                         </td>
@@ -133,11 +131,10 @@ function formatList($data) {
                         <td><?= htmlspecialchars($user['poids_actuel'] ?? '') ?></td>
                         <td><?= htmlspecialchars($user['objectif'] ?? '') ?></td>
 
-                        <!-- ALLERGENES -->
+                        <!-- ALLERGÈNES -->
                         <td>
                             <?php
-                            $allergenes = formatList($user['allergenes'] ?? '');
-                            foreach ($allergenes as $a) {
+                            foreach (formatList($user['allergenes'] ?? '') as $a) {
                                 if (!empty(trim($a))) {
                                     echo '<span class="badge badge-green">' . htmlspecialchars(trim($a)) . '</span>';
                                 }
@@ -148,8 +145,7 @@ function formatList($data) {
                         <!-- CARENCES -->
                         <td>
                             <?php
-                            $carences = formatList($user['carences'] ?? '');
-                            foreach ($carences as $c) {
+                            foreach (formatList($user['carences'] ?? '') as $c) {
                                 if (!empty(trim($c))) {
                                     echo '<span class="badge badge-green">' . htmlspecialchars(trim($c)) . '</span>';
                                 }
@@ -160,8 +156,7 @@ function formatList($data) {
                         <!-- MALADIES -->
                         <td>
                             <?php
-                            $maladies = formatList($user['maladies'] ?? '');
-                            foreach ($maladies as $m) {
+                            foreach (formatList($user['maladies'] ?? '') as $m) {
                                 if (!empty(trim($m))) {
                                     echo '<span class="badge badge-green">' . htmlspecialchars(trim($m)) . '</span>';
                                 }
@@ -171,11 +166,14 @@ function formatList($data) {
 
                         <td><?= htmlspecialchars($user['date_mise_a_jour'] ?? '') ?></td>
 
+                        <!-- ACTIONS -->
                         <td>
-                            <a class="btn" href="details.php?id=<?= $user['id'] ?>">
-                                Détail
-                            </a>
+<a class="btn"
+   href="/Views/backoffice/details.php?id=<?= urlencode($user['id_utilisateur']) ?>">
+    Détail
+</a>
                         </td>
+
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
@@ -215,7 +213,7 @@ new Chart(ctxPie, {
                 <?= $pieStats['avec'] ?>,
                 <?= $pieStats['sans'] ?>
             ],
-            backgroundColor: ['#18741e', '#bdc3c7'],
+            backgroundColor: ['#18741e', '#ff0505'],
             borderWidth: 1
         }]
     },

@@ -11,11 +11,7 @@ error_reporting(E_ALL);
 
 $controller = new SuiviJournalierController();
 
-$search = $_GET['search'] ?? null;
-
-$users = !empty($search)
-    ? $controller->searchUsersBackoffice($search)
-    : $controller->listUsersBackoffice();
+$users = $controller->listUsersBackoffice();
 
 function formatList($data) {
     if (empty($data)) return '-';
@@ -94,7 +90,7 @@ if (!empty($users)) {
     foreach ($users as $user) {
         $html .= '
         <tr>
-            <td>'.($user['id'] ?? '-').'</td>
+            <td>'.($user['id_profil_sante'] ?? '-').'</td>
             <td>'.($user['prenom'] ?? '').' '.($user['nom'] ?? '').'</td>
             <td>'.($user['email'] ?? '-').'</td>
             <td>'.($user['taille'] ?? '-').'</td>

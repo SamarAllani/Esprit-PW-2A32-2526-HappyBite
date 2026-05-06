@@ -8,6 +8,8 @@
 </head>
 
 
+
+
 <body>
 
 
@@ -175,7 +177,7 @@
     <h2>Suivis journaliers</h2>
 
     <!-- SEARCH -->
-    <form method="GET" class="search-suivi">
+    <form id="searchForm" class="search-suivi">
 
     <input type="hidden" name="action" value="userHealthSpace">
     <input type="hidden" name="id_utilisateur" value="<?= $user['id'] ?>">
@@ -208,12 +210,19 @@
 
         <!-- BOUTON UNIQUE -->
         <button type="submit" class="btn-filter">
-            Appliquer
+           Filtrer
         </button>
-
+<button type="button" id="resetFilter" class="btn-reset">
+    Annuler
+</button>
     </div>
 </form>
 <?php
+
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 4; 
+$offset = ($page - 1) * $limit;
+
 $suivisFiltered = $suivis;
 
 /* FILTRE DATE */
@@ -231,6 +240,7 @@ if (!$sort) {
     usort($suivisFiltered, fn($a, $b) =>
         strtotime($b['date_jour']) <=> strtotime($a['date_jour'])
     );
+
 } else {
 
     $map = [
@@ -251,13 +261,16 @@ if (!$sort) {
         usort($suivisFiltered, $map[$sort]);
     }
 }
+$total = count($suivisFiltered);
+$totalPages = ceil($total / $limit);
+$suivisPaged = array_slice($suivisFiltered, $offset, $limit);
 ?>
 
-<?php if (!empty($suivisFiltered)): ?>
+<?php if (!empty($suivisPaged)): ?>
 
-<div class="suivi-container">
+<div class="suivi-container" id="suiviContainer">
 
-<?php foreach ($suivisFiltered as $suivi): ?>
+<?php foreach ($suivisPaged as $suivi): ?>
 
 <div class="card-suivi">
 
@@ -309,8 +322,14 @@ if (!$sort) {
         </div>
 
     </div>
-
+    
+<div class="card-actions">
     <!-- ACTIONS -->
+<button class="btn-conseil" onclick="afficherConseil(<?= $suivi['id'] ?>)">
+    <i class="fas fa-lightbulb"></i>
+</button>
+
+
     <div class="card-actions">
 
         <a class="btn-edit"
@@ -323,15 +342,40 @@ if (!$sort) {
               onsubmit="return confirm('Supprimer ?');">
 
             <button class="btn-delete" type="submit">Supprimer</button>
-        </form>
 
+        </form>
+        
+</div>
     </div>
 
 </div>
 
 <?php endforeach; ?>
 
+</div> <!-- suiviContainer -->
+
+<div class="pagination" id="pagination">
+
+<button 
+    class="btn-page"
+    onclick="loadPage(<?= $page - 1 ?>)"
+    <?= ($page <= 1) ? 'disabled' : '' ?>>
+    &lt;
+</button>
+
+<span class="page-info">
+    Page <?= $page ?> / <?= $totalPages ?>
+</span>
+
+<button 
+    class="btn-page"
+    onclick="loadPage(<?= $page + 1 ?>)"
+    <?= ($page >= $totalPages) ? 'disabled' : '' ?>>
+    &gt;
+</button>
+
 </div>
+
 </div >
 <?php else: ?>
 
@@ -346,6 +390,188 @@ if (empty($suivis)) {
 </p>
 
 <?php endif; ?>
+</div>
+
+<!-- POPUP -->
+<div id="popup" class="popup">
+    <div class="popup-box">
+        <h3>Conseil du jour</h3>
+        <div id="popupContent"></div>
+        <button onclick="fermerPopup()">Fermer</button>
+    </div>
+</div>
+
+<!-- JS -->
+<script>
+function afficherConseil(id) {
+    fetch("index.php?action=getConseil&id=" + id)
+        .then(res => res.json())
+        .then(data => {
+
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            let html = `
+                <div class="conseil-box">
+                    ${data.conseil_ai}
+                </div>
+            `;
+
+            document.getElementById("popupContent").innerHTML = html;
+            document.getElementById("popup").style.display = "flex";
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erreur serveur");
+        });
+}
+function fermerPopup() {
+    document.getElementById("popup").style.display = "none";
+}
+
+function loadPage(page) {
+
+    const url = new URL(window.location.href);
+
+    url.searchParams.set("page", page);
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+       
+            const newContent = doc.getElementById("suiviContainer").innerHTML;
+            document.getElementById("suiviContainer").innerHTML = newContent;
+
+           
+const newPagination = doc.getElementById("pagination");
+if (newPagination) {
+    document.getElementById("pagination").innerHTML = newPagination.innerHTML;
+}
+
+            
+            window.history.pushState({}, "", url);
+
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erreur chargement");
+        });
+}
+document.getElementById("searchForm").addEventListener("submit", function(e) {
+    e.preventDefault(); // 🚫 empêche reload
+
+    const form = e.target;
+    const url = new URL(window.location.href);
+
+    // récupérer les valeurs
+    const formData = new FormData(form);
+
+    formData.forEach((value, key) => {
+        url.searchParams.set(key, value);
+    });
+
+    // toujours revenir à page 1 après recherche
+    url.searchParams.set("page", 1);
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            // ✅ update les cards
+            document.getElementById("suiviContainer").innerHTML =
+                doc.getElementById("suiviContainer").innerHTML;
+
+            // ✅ update pagination
+            const newPagination = doc.getElementById("pagination");
+            if (newPagination) {
+                document.getElementById("pagination").innerHTML =
+                    newPagination.innerHTML;
+            }
+
+            // ✅ update URL sans reload
+            window.history.pushState({}, "", url);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erreur recherche");
+        });
+});
+document.querySelector("input[name='date']").addEventListener("input", function () {
+
+    // si le champ est vide → reset (afficher tout)
+    if (this.value === "") {
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete("date");
+        url.searchParams.set("page", 1);
+
+        fetch(url)
+            .then(res => res.text())
+            .then(html => {
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+
+                document.getElementById("suiviContainer").innerHTML =
+                    doc.getElementById("suiviContainer").innerHTML;
+
+                const newPagination = doc.getElementById("pagination");
+                if (newPagination) {
+                    document.getElementById("pagination").innerHTML =
+                        newPagination.innerHTML;
+                }
+
+                window.history.pushState({}, "", url);
+            })
+            .catch(err => console.error(err));
+    }
+});
+document.getElementById("resetFilter").addEventListener("click", function () {
+
+    // reset champs
+    document.querySelector("input[name='date']").value = "";
+    document.querySelector("select[name='sort']").value = "";
+
+    const url = new URL(window.location.href);
+
+    // supprimer filtres
+    url.searchParams.delete("date");
+    url.searchParams.delete("sort");
+    url.searchParams.set("page", 1);
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            document.getElementById("suiviContainer").innerHTML =
+                doc.getElementById("suiviContainer").innerHTML;
+
+            const newPagination = doc.getElementById("pagination");
+            if (newPagination) {
+                document.getElementById("pagination").innerHTML =
+                    newPagination.innerHTML;
+            }
+
+            window.history.pushState({}, "", url);
+        })
+
+        .catch(err => console.error(err));
+});
+
+</script>
+
 
 </div>
 
@@ -354,15 +580,6 @@ if (empty($suivis)) {
 
 
 <br><br>
-
-</body>
-</html>
-
-</div>
-
-<br><br>
-
-
 
 </body>
 </html>

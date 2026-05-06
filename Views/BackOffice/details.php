@@ -23,7 +23,7 @@ $suivisFiltered = $suivis;
 /* =========================
    FILTRE DATE (RECHERCHE)
 ========================= */
-if ($action === 'search' && $date) {
+if ($date){
     $suivisFiltered = array_filter($suivisFiltered, function ($s) use ($date) {
         return $s['date_jour'] === $date;
     });
@@ -32,7 +32,7 @@ if ($action === 'search' && $date) {
 /* =========================
    TRI
 ========================= */
-if ($action === 'apply' && $sort) {
+if ($sort){
 
     $map = [
         'poids_asc' => fn($a,$b) => $a['poids'] <=> $b['poids'],
@@ -111,57 +111,69 @@ $scoreHydratation = min(100, ($avgHydratation / 2) * 100);
 
 <div class="content">
 
-<div class="card" style="height: 300px;">
+<div class="charts-grid" style="height: 300px;">
 
-    <canvas id="statsChart" height="200"></canvas>
+    <canvas id="chartPoids"></canvas>
+<canvas id="chartCalories"></canvas>
+<canvas id="chartSommeil"></canvas>
+<canvas id="chartPas"></canvas>
 </div>
 
    
 
     <br>
+    <form id="searchForm" class="search-suivi">
 
-   
+    <input type="hidden" name="action" value="userHealthSpace">
+    <input type="hidden" name="id_utilisateur" value="<?= $user['id'] ?>">
 
-    <!-- FORMULAIRE -->
-    <form method="GET">
+    <div class="search-suivi-box">
+        <i class="fas fa-calendar"></i>
 
-        <input type="hidden" name="id" value="<?= $id ?>">
-
-        <!-- DATE -->
         <input type="date"
                name="date"
-               value="<?= htmlspecialchars($date ?? '') ?>">
-
-        <button type="submit" name="action" value="search">
-            Rechercher
-        </button>
-
-        <!-- TRI -->
+               value="<?= htmlspecialchars($_GET['date'] ?? '') ?>">
+                  <button type="submit">
+        Rechercher
+    </button>
+  <!-- TRI -->
         <select name="sort">
             <option value="">Tri par défaut (date)</option>
+
             <option value="poids_asc">Poids ↑</option>
             <option value="poids_desc">Poids ↓</option>
+
             <option value="calories_asc">Calories ↑</option>
             <option value="calories_desc">Calories ↓</option>
+
             <option value="sommeil_asc">Sommeil ↑</option>
             <option value="sommeil_desc">Sommeil ↓</option>
+
             <option value="pas_asc">Pas ↑</option>
             <option value="pas_desc">Pas ↓</option>
         </select>
 
-        <button type="submit" name="action" value="apply" class="btn-filter">
-            Appliquer
+        <!-- BOUTON UNIQUE -->
+        <button type="submit" class="btn-filter">
+           Filtrer
         </button>
- <a href="export_pdf.php?id=<?= $id ?>" target="_blank" class="pdf-btn">
+<button type="button" id="resetFilter" class="btn-reset">
+    Annuler
+</button>
+<a href="export_pdf.php?id=<?= $id ?>" target="_blank" class="pdf-btn">
         📄 Exporter en PDF
     </a>
-    </form>
+    </div>
+</form>
+   
+
+  
 
     <br>
  <h2>Suivi de <?= $user['nom'] ?? $user['name'] ?></h2>
     <p><?= $user['email'] ?></p>
-    <!-- TABLE -->
-    <table>
+<div id="tableContainer">
+<table>
         <thead>
             <tr>
                 <th>Date</th>
@@ -196,56 +208,156 @@ $scoreHydratation = min(100, ($avgHydratation / 2) * 100);
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-const ctx = document.getElementById('statsChart');
+    let charts = {};
 
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?= json_encode(array_column($suivisFiltered, 'date_jour')) ?>,
+document.getElementById("searchForm").addEventListener("submit", function(e) {
+    e.preventDefault();
 
-        datasets: [
-            {
-                label: 'Poids (kg)',
-                data: <?= json_encode(array_column($suivisFiltered, 'poids')) ?>,
-                borderColor: 'blue',
-                tension: 0.3
-            },
-            {
-                label: 'Calories',
-                data: <?= json_encode(array_column($suivisFiltered, 'calories')) ?>,
-                borderColor: 'red',
-                tension: 0.3
-            },
-            {
-                label: 'Sommeil (h)',
-                data: <?= json_encode(array_column($suivisFiltered, 'sommeil_heures')) ?>,
-                borderColor: 'green',
-                tension: 0.3
-            },
-            {
-                label: 'Pas',
-                data: <?= json_encode(array_column($suivisFiltered, 'nbr_pas')) ?>,
-                borderColor: 'orange',
-                tension: 0.3
-            }
-        ]
-    },
+    const form = e.target;
+    const url = new URL(window.location.href);
 
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom'
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
+    const formData = new FormData(form);
+
+    formData.forEach((value, key) => {
+        url.searchParams.set(key, value);
+    });
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            // ✅ تحديث الجدول فقط
+            document.getElementById("tableContainer").innerHTML =
+                doc.getElementById("tableContainer").innerHTML;
+
+            // ✅ تحديث chart
+            updateChart(doc);
+
+            // ✅ تحديث URL بدون reload
+            window.history.pushState({}, "", url);
+        })
+        .catch(err => console.error(err));
+});
+document.getElementById("resetFilter").addEventListener("click", function () {
+
+    // reset inputs
+    document.querySelector("input[name='date']").value = "";
+    document.querySelector("select[name='sort']").value = "";
+
+    const url = new URL(window.location.href);
+
+    // 🔥 نحيو كل الفلاتر
+    url.searchParams.delete("date");
+    url.searchParams.delete("sort");
+    url.searchParams.delete("action");
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            document.getElementById("tableContainer").innerHTML =
+                doc.getElementById("tableContainer").innerHTML;
+
+            updateChart(doc);
+
+            window.history.pushState({}, "", url);
+        })
+        .catch(err => console.error(err));
+});
+document.querySelector("input[name='date']").addEventListener("input", function () {
+
+    // إذا فضّى التاريخ
+    if (this.value === "") {
+
+        const url = new URL(window.location.href);
+
+        url.searchParams.delete("date");
+        url.searchParams.set("page", 1);
+
+        fetch(url)
+            .then(res => res.text())
+            .then(html => {
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+
+                document.getElementById("tableContainer").innerHTML =
+                    doc.getElementById("tableContainer").innerHTML;
+
+                updateChart(doc);
+
+                window.history.pushState({}, "", url);
+            })
+            .catch(err => console.error(err));
     }
 });
+let chart; // نخلي chart global
+
+window.addEventListener("load", () => {
+    updateChart(document);
+});
+function updateChart(doc) {
+
+    const rows = doc.querySelectorAll("#tableContainer tbody tr");
+
+    let labels = [];
+    let poids = [];
+    let calories = [];
+    let sommeil = [];
+    let pas = [];
+
+    rows.forEach(row => {
+        const cols = row.querySelectorAll("td");
+
+        labels.push(cols[0].textContent);
+        poids.push(parseFloat(cols[1].textContent) || 0);
+        calories.push(parseFloat(cols[2].textContent) || 0);
+        sommeil.push(parseFloat(cols[3].textContent) || 0);
+        pas.push(parseFloat(cols[4].textContent) || 0);
+    });
+
+    createSingleChart('chartPoids', 'Poids', poids, labels, 'blue');
+    createSingleChart('chartCalories', 'Calories', calories, labels, 'red');
+    createSingleChart('chartSommeil', 'Sommeil', sommeil, labels, 'green');
+    createSingleChart('chartPas', 'Pas', pas, labels, 'orange');
+}
+
+
+
+function createSingleChart(id, label, data, labels, color) {
+
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    if (charts[id]) {
+        charts[id].destroy();
+    }
+
+    charts[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: data,
+                borderColor: color,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+}
 </script>
 
 </body>
-</html> centre le catistique
+</html> 

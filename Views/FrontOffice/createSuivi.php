@@ -97,10 +97,10 @@
     <?php $h = $last['hydratation_litre'] ?? ''; ?>
 
     <div class="radio-group">
-        <label><input type="radio" name="hydratation_litre" value="moins_1L"> Moins 1L</label>
-        <label><input type="radio" name="hydratation_litre" value="1_1.5L"> 1 à 1.5L</label>
-        <label><input type="radio" name="hydratation_litre" value="1.5_2L"> 1.5 à 2L</label>
-        <label><input type="radio" name="hydratation_litre" value="plus_2L"> +2L</label>
+        <label><input type="radio" name="hydratation_litre" value="moins_1L"> moins_1L</label>
+        <label><input type="radio" name="hydratation_litre" value="1_1.5L">1_1.5L</label>
+        <label><input type="radio" name="hydratation_litre" value="1.5_2L">1.5_2L</label>
+        <label><input type="radio" name="hydratation_litre" value="plus_2L">+2L</label>
     </div>
 
     <small>Dernier choix: <?= htmlspecialchars($h) ?></small>

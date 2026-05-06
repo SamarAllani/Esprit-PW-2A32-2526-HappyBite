@@ -5,18 +5,18 @@ require_once __DIR__ . '/../Config.php';
 class SuiviJournalierController
 {
     private $db;
-
+//Ouvre la connexion à la base de données.
     public function __construct()
     {
         $this->db = (new Config())->getConnexion();
     }
-
+//Redirige vers la page principale du suivi santé.
     private function redirect($id_utilisateur)
     {
         header("Location: index.php?action=userHealthSpace&id_utilisateur=" . $id_utilisateur);
         exit();
     }
-
+//Récupère l’ID du profil santé lié à un utilisateur.
     private function getProfilId($id_utilisateur)
     {
         $stmt = $this->db->prepare("SELECT id FROM profil_sante WHERE id_utilisateur = :id");
@@ -29,6 +29,7 @@ class SuiviJournalierController
     /* =========================
        CREATE
     ========================= */
+//Crée un suivi journalier.
 public function create($id_utilisateur)
 {
     $id_profil = $this->getProfilId($id_utilisateur);
@@ -85,6 +86,7 @@ public function create($id_utilisateur)
     /* =========================
        LIST USER
     ========================= */
+//Récupère un utilisateur.
 public function getUser($id)
 {
     $stmt = $this->db->prepare("SELECT * FROM utilisateur WHERE id = :id");
@@ -98,7 +100,7 @@ public function getUser($id)
 
     return $user;
 }
-
+//recupere tout les suivis d'un utilisateur
     public function getSuiviUser($id_utilisateur)
     {
         $stmt = $this->db->prepare("
@@ -117,6 +119,7 @@ public function getUser($id)
     /* =========================
        EDIT (AFFICHAGE FORM)
     ========================= */
+    //affiche le formulaire d'edition d'un suivi
     public function edit($id)
 {
     $stmt = $this->db->prepare("SELECT * FROM suivi_journalier WHERE id = :id");
@@ -132,26 +135,29 @@ public function getUser($id)
     
 
     include __DIR__ . '/../Views/FrontOffice/editSuivi.php';
-}public function listUsersBackoffice()
+}
+//lister tout les utilisateur avec leur profil sante
+public function listUsersBackoffice()
 {
-    $stmt = $this->db->query("
-        SELECT 
-            u.id,
-            u.prenom,
-            u.nom,
-            u.email,
+    
+  $stmt = $this->db->query("
+SELECT 
+    u.id AS id_utilisateur,
+    ps.id AS id_profil_sante,
+    u.prenom,
+    u.nom,
+    u.email,
+    ps.taille,
+    ps.poids_actuel,
+    ps.objectif,
+    ps.allergenes,
+    ps.carences,
+    ps.maladies,
+    ps.date_mise_a_jour
+FROM utilisateur u
+INNER JOIN profil_sante ps 
+    ON ps.id_utilisateur = u.id
 
-            ps.taille,
-            ps.poids_actuel,
-            ps.objectif,
-            ps.allergenes,
-            ps.carences,
-            ps.maladies,
-            ps.date_mise_a_jour
-
-        FROM utilisateur u
-        INNER JOIN profil_sante ps 
-            ON ps.id_utilisateur = u.id
     ");
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -159,6 +165,7 @@ public function getUser($id)
     /* =========================
        UPDATE (POST)
     ========================= */
+//met a jour un suivi
 public function update($id)
 {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -192,6 +199,7 @@ public function update($id)
         exit();
     }
 }
+//supprimer un suivi
  public function delete($id, $id_utilisateur)
 {
     $sql = "DELETE FROM suivi_journalier WHERE id = ?";
@@ -201,6 +209,7 @@ public function update($id)
    header("Location: index.php?action=userHealthSpace&id_utilisateur=" . $id_utilisateur);
     exit();
 }  
+//page principale du suivi utilisateur
 public function list($id_utilisateur)
 {
     $stmt = $this->db->prepare("SELECT * FROM utilisateur WHERE id = ?");
@@ -243,31 +252,29 @@ public function list($id_utilisateur)
 {
     $search = strtolower(trim($search));
 
-    $stmt = $this->db->prepare("
-        SELECT 
-            u.id,
-            u.prenom,
-            u.nom,
-            u.email,
-
-            ps.taille,
-            ps.poids_actuel,
-            ps.objectif,
-            ps.allergenes,
-            ps.carences,
-            ps.maladies,
-            ps.date_mise_a_jour
-
-        FROM utilisateur u
-        INNER JOIN profil_sante ps 
-            ON ps.id_utilisateur = u.id
-
-        WHERE 
-            LOWER(u.prenom) LIKE :search
-            OR LOWER(u.nom) LIKE :search
-            OR LOWER(u.email) LIKE :search
-            OR CAST(u.id AS CHAR) LIKE :search
-    ");
+$stmt = $this->db->prepare("
+    SELECT 
+        u.id AS id_utilisateur,
+        ps.id AS id_profil_sante,
+        u.prenom,
+        u.nom,
+        u.email,
+        ps.taille,
+        ps.poids_actuel,
+        ps.objectif,
+        ps.allergenes,
+        ps.carences,
+        ps.maladies,
+        ps.date_mise_a_jour
+    FROM utilisateur u
+    INNER JOIN profil_sante ps 
+        ON ps.id_utilisateur = u.id
+    WHERE 
+        LOWER(u.prenom) LIKE :search
+        OR LOWER(u.nom) LIKE :search
+        OR LOWER(u.email) LIKE :search
+        OR CAST(ps.id AS CHAR) LIKE :search
+");
 
     $stmt->execute([
         'search' => '%' . $search . '%'
@@ -299,43 +306,7 @@ public function getStatsProfilsVsNon()
     ];
 }
 
-public function searchSuiviAjax($id_utilisateur, $date)
-{
-    $stmt = $this->db->prepare("
-        SELECT sj.*
-        FROM suivi_journalier sj
-        JOIN profil_sante ps ON sj.id_profil_sante = ps.id
-        WHERE ps.id_utilisateur = :id
-        AND sj.date_jour = :date
-    ");
-
-    $stmt->execute([
-        'id' => $id_utilisateur,
-        'date' => $date
-    ]);
-
-    $data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    header('Content-Type: application/json');
-    echo json_encode($data);
-    exit();
-}
-public function listAjax($id_utilisateur)
-{
-    $stmt = $this->db->prepare("
-        SELECT sj.*
-        FROM suivi_journalier sj
-        JOIN profil_sante ps ON sj.id_profil_sante = ps.id
-        WHERE ps.id_utilisateur = :id
-        ORDER BY sj.date_jour DESC
-    ");
-
-    $stmt->execute(['id' => $id_utilisateur]);
-
-    header('Content-Type: application/json');
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    exit();
-}
+//récupère le dernier suivi
 public function getLastSuivi($id_utilisateur)
 {
     $stmt = $this->db->prepare("
@@ -386,4 +357,139 @@ private function sortSuivis(array $suivis, array $params)
 
     return $suivis;
 }
+public function getConseil($id)
+{
+    header('Content-Type: application/json');
+
+    $stmt = $this->db->prepare("SELECT * FROM suivi_journalier WHERE id = ?");
+    $stmt->execute([$id]);
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$data) {
+        echo json_encode(["error" => "Aucune donnée"]);
+        exit();
+    }
+
+    $id_profil = $data['id_profil_sante'];
+
+    $stmt = $this->db->prepare("SELECT * FROM profil_sante WHERE id = ?");
+    $stmt->execute([$id_profil]);
+    $profil = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$profil) {
+        echo json_encode(["error" => "Profil introuvable"]);
+        exit();
+    }
+
+    $objectif = $profil['objectif'] ?? "maintenir";
+
+    $aiConseil = $this->getAIConseil($data, $objectif);
+
+ echo json_encode([
+    "conseil_ai" => nl2br($aiConseil), // 👈 important
+    "score" => 70,
+    "niveau" => "Correct"
+]);
+
+    exit();
+}
+private function getHistorique($id_profil)
+{
+    $stmt = $this->db->prepare("
+        SELECT * FROM suivi_journalier
+        WHERE id_profil_sante = ?
+        ORDER BY date_jour DESC
+        LIMIT 7
+    ");
+
+    $stmt->execute([$id_profil]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+private function getAIConseil($data, $objectif)
+{
+$prompt = <<<EOT
+Tu es un coach fitness intelligent.
+
+OBJECTIF UTILISATEUR : {$objectif}
+
+MISSION :
+Analyse les données et compare avec l’objectif.
+Si une valeur ne correspond pas à l’objectif → donne un conseil clair pour corriger.
+
+RÈGLES :
+- Maximum 4 conseils
+- Chaque conseil doit être COURT et PRÉCIS
+- Utilise des chiffres (ex: 2L eau, 8000 pas)
+- Ignore les données correctes
+- Ne parle que des problèmes
+- Ton simple, direct
+
+FORMAT OBLIGATOIRE :
+
+- Conseil 1 : ...
+
+- Conseil 2 : ...
+
+- Conseil 3 : ...
+
+- Conseil 4 : ...
+
+- Motivation : phrase courte motivante
+
+DONNÉES :
+- Calories : {$data['calories']}
+- Sommeil : {$data['sommeil_heures']} heures
+- Pas : {$data['nbr_pas']}
+- Sport : {$data['nbr_activites_sport']}
+- Hydratation : {$data['hydratation_litre']} L
+
+RAPPEL OBJECTIF :
+- Perte de poids → réduire calories + augmenter activité
+- Prise de masse → augmenter calories + sport
+- Maintien → équilibre général
+EOT;
+    $url = "https://api.openai.com/v1/chat/completions";
+
+    $postData = [
+        "model" => "gpt-4o-mini",
+        "messages" => [
+            [
+                "role" => "system",
+                "content" => "Tu es un coach fitness utile et motivant."
+            ],
+            [
+                "role" => "user",
+                "content" => $prompt
+            ]
+        ],
+        "temperature" => 0.7
+    ];
+
+    $ch = curl_init();
+
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer " . OPENAI_API_KEY
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+
+    $response = curl_exec($ch);
+
+    if (curl_errno($ch)) {
+        curl_close($ch);
+        return "Erreur API ChatGPT (curl)";
+    }
+
+    curl_close($ch);
+
+    $result = json_decode($response, true);
+
+    return $result['choices'][0]['message']['content']
+        ?? "Pas de conseil disponible";
+}
+
 }
