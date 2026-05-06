@@ -1,48 +1,81 @@
 <?php
+session_start();
+
+
 require_once '../../Controllers/FrigoController.php';
 require_once '../../Controllers/CategorieController.php';
+require_once '../../Controllers/AiRecetteController.php';
+require_once '../../Config.php';
 
 $frigoController = new FrigoController();
 $categorieController = new CategorieController();
 
-// utilisateur fixe temporaire
 $idUtilisateur = 12;
 
 $motCle = trim($_GET['motCle'] ?? '');
 $idCategorie = trim($_GET['id_categorie'] ?? '');
 
 $categories = $categorieController->listCategories();
+$recetteIA = null;
+$menuArray = [];
+
+if (isset($_SESSION['chefbot_menu'][$idUtilisateur])) {
+    $recetteIA = $_SESSION['chefbot_menu'][$idUtilisateur];
+    $menuArray = json_decode($recetteIA, true);
+}
+
+$db = Config::getConnexion();
+
+$stmt = $db->prepare("
+    SELECT objectif, allergenes, carences, maladies
+    FROM profil_sante
+    WHERE id_utilisateur = :id_utilisateur
+    LIMIT 1
+");
+
+$stmt->execute([
+    'id_utilisateur' => $idUtilisateur
+]);
+
+$profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $idProduit = (int)($_POST['id_produit'] ?? 0);
-    $quantite = (int)($_POST['quantite'] ?? 1);
 
-    if ($action === 'ajouter' && $idProduit > 0 && $quantite > 0) {
-        $frigoController->ajouterAuFrigo($idUtilisateur, $idProduit, $quantite);
+    if (isset($_POST['generer_recette_ia'])) {
+        $produitsFrigoTemp = $frigoController->getFrigoByUtilisateur($idUtilisateur, $motCle, $idCategorie);
+
+        if (!empty($produitsFrigoTemp)) {
+            $aiController = new AiRecetteController();
+            $recetteIA = $aiController->genererMenuSemaine($produitsFrigoTemp, $profilSante);
+
+// sauvegarder le menu pour cet utilisateur
+            $_SESSION['chefbot_menu'][$idUtilisateur] = $recetteIA;
+
+            $menuArray = json_decode($recetteIA, true);
+        } else {
+            $recetteIA = "Votre frigo est vide. Impossible de générer une recette.";
+        }
+
+    } else {
+        $action = $_POST['action'] ?? '';
+        $idProduit = (int)($_POST['id_produit'] ?? 0);
+        $quantite = (int)($_POST['quantite'] ?? 1);
+
+        if ($action === 'ajouter' && $idProduit > 0 && $quantite > 0) {
+            $frigoController->ajouterAuFrigo($idUtilisateur, $idProduit, $quantite);
+        }
+
+        if ($action === 'modifier' && $idProduit > 0) {
+            $frigoController->updateQuantite($idUtilisateur, $idProduit, $quantite);
+        }
+
+        if ($action === 'supprimer' && $idProduit > 0) {
+            $frigoController->supprimerDuFrigo($idUtilisateur, $idProduit);
+        }
+
+        header('Location: List-Frigo.php#frigo-zone');
+        exit;
     }
-
-    if ($action === 'modifier' && $idProduit > 0) {
-        $frigoController->updateQuantite($idUtilisateur, $idProduit, $quantite);
-    }
-
-    if ($action === 'supprimer' && $idProduit > 0) {
-        $frigoController->supprimerDuFrigo($idUtilisateur, $idProduit);
-    }
-
-    $queryString = http_build_query([
-        'motCle' => $motCle,
-        'id_categorie' => $idCategorie
-    ]);
-
-    $redirectUrl = 'List-Frigo.php';
-    if (!empty($queryString) && $queryString !== 'motCle=&id_categorie=') {
-        $redirectUrl .= '?' . $queryString;
-    }
-    $redirectUrl .= '#frigo-zone';
-
-    header('Location: ' . $redirectUrl);
-    exit;
 }
 
 $produitsFrigo = $frigoController->getFrigoByUtilisateur($idUtilisateur, $motCle, $idCategorie);
@@ -58,6 +91,105 @@ $totalProduits = $frigoController->getNombreProduitsDansFrigo($idUtilisateur);
 
     <link rel="stylesheet" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="/Views/assets/css/style.css">
+    <style>
+.chefbot-header {
+    background: linear-gradient(135deg, #e8f8ef, #ffffff);
+    border-radius: 24px;
+    padding: 28px;
+    margin-bottom: 25px;
+    border-left: 6px solid #20b978;
+}
+
+.chefbot-header h3 {
+    color: #13a66b;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.chefbot-header p {
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.chefbot-profile {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.chefbot-profile span {
+    background: white;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 600;
+    color: #2f6b4f;
+    border: 1px solid #d7f0e2;
+}
+
+.chefbot-scroll {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding: 10px 5px 25px;
+    scroll-snap-type: x mandatory;
+}
+
+.chefbot-card {
+    min-width: 360px;
+    max-width: 360px;
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    scroll-snap-align: start;
+    border: 1px solid #eef4ef;
+}
+
+.chefbot-day {
+    background: #20b978;
+    color: white;
+    display: inline-block;
+    padding: 8px 15px;
+    border-radius: 999px;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.chefbot-card h4 {
+    font-weight: 800;
+    color: #173b2c;
+    margin-bottom: 15px;
+}
+
+.chefbot-card h6 {
+    color: #13a66b;
+    font-weight: 800;
+    margin-top: 15px;
+}
+
+.priority {
+    background: #f4fff8;
+    border-radius: 16px;
+    padding: 12px;
+    color: #456;
+}
+
+.why-box {
+    background: #fff8e6;
+    border-radius: 16px;
+    padding: 14px;
+    margin-top: 15px;
+    color: #5d4a1f;
+}
+
+.chefbot-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.chefbot-scroll::-webkit-scrollbar-thumb {
+    background: #20b978;
+    border-radius: 999px;
+}
+</style>
 </head>
 <body>
 
@@ -95,6 +227,74 @@ $totalProduits = $frigoController->getNombreProduitsDansFrigo($idUtilisateur);
         <strong>Profil fixe temporaire :</strong> utilisateur ID <?php echo $idUtilisateur; ?><br>
         <strong>Nombre d'articles distincts :</strong> <?php echo $totalProduits; ?>
     </div>
+
+    <form method="POST" class="text-center mb-4">
+        <button type="submit" name="generer_recette_ia" class="btn btn-warning px-4 py-2 rounded-pill">
+             Générer une recette avec mon frigo
+        </button>
+    </form>
+
+    <?php if (!empty($menuArray) && is_array($menuArray)): ?>
+
+<div class="chefbot-section mb-5">
+
+    <div class="chefbot-header shadow-sm">
+        <h3> ChefBot Planner</h3>
+        <p>ChefBot a analysé votre frigo, votre profil santé et les produits les plus anciens pour limiter le gaspillage.</p>
+
+        <div class="chefbot-profile">
+            <span> Objectif : <?php echo htmlspecialchars($profilSante['objectif'] ?? 'non précisé'); ?></span>
+            <span> Santé : <?php echo htmlspecialchars(($profilSante['maladies'] ?? 'aucune maladie') . ' | Allergènes : ' . ($profilSante['allergenes'] ?? 'aucun') . ' | Carences : ' . ($profilSante['carences'] ?? 'aucune')); ?></span>
+        </div>
+    </div>
+
+    <div class="chefbot-scroll">
+        <?php foreach ($menuArray as $jour): ?>
+            <div class="chefbot-card shadow-sm">
+
+                <div class="chefbot-day">
+                    📅 <?php echo htmlspecialchars($jour['jour'] ?? 'Jour'); ?>
+                </div>
+
+                <h4><?php echo htmlspecialchars($jour['titre'] ?? 'Recette'); ?></h4>
+
+                <p class="priority">
+                     <strong>Produits prioritaires :</strong><br>
+                    <?php echo htmlspecialchars($jour['produits_prioritaires'] ?? 'non précisé'); ?>
+                </p>
+
+                <h6> Ingrédients</h6>
+                <ul>
+                    <?php foreach (($jour['ingredients'] ?? []) as $ingredient): ?>
+                        <li><?php echo htmlspecialchars($ingredient); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+
+                <h6> Étapes</h6>
+                <ol>
+                    <?php foreach (($jour['etapes'] ?? []) as $etape): ?>
+                        <li><?php echo htmlspecialchars($etape); ?></li>
+                    <?php endforeach; ?>
+                </ol>
+
+                <div class="why-box">
+                    <strong>Pourquoi ?</strong><br>
+                    <?php echo htmlspecialchars($jour['pourquoi'] ?? ''); ?>
+                </div>
+
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+</div>
+
+<?php elseif ($recetteIA): ?>
+
+<div class="alert alert-warning">
+    <?php echo nl2br(htmlspecialchars($recetteIA)); ?>
+</div>
+
+<?php endif; ?>
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
@@ -146,6 +346,7 @@ $totalProduits = $frigoController->getNombreProduitsDansFrigo($idUtilisateur);
                 $allergenes = array_filter(array_map('trim', explode(',', $produit['allergene'] ?? '')));
                 $benefices = array_filter(array_map('trim', explode(',', $produit['benefices'] ?? '')));
                 ?>
+
                 <div class="col-md-6 col-lg-4 mb-4" id="frigo-produit-<?php echo $produit['id_produit']; ?>">
                     <div class="card h-100 shadow-sm border-0 rounded-4">
                         <div class="card-body d-flex flex-column">
@@ -221,12 +422,15 @@ $totalProduits = $frigoController->getNombreProduitsDansFrigo($idUtilisateur);
                                         <form method="POST" class="m-0">
                                             <input type="hidden" name="action" value="modifier">
                                             <input type="hidden" name="id_produit" value="<?php echo $produit['id_produit']; ?>">
-                                            <input type="number"
-                                                   name="quantite"
-                                                   min="0"
-                                                   value="<?php echo (int)$produit['quantite']; ?>"
-                                                   class="form-control form-control-sm rounded-pill">
+                                            <input
+                                                type="number"
+                                                name="quantite"
+                                                min="0"
+                                                value="<?php echo (int)$produit['quantite']; ?>"
+                                                class="form-control form-control-sm rounded-pill"
+                                            >
                                     </div>
+
                                     <div class="col-5">
                                             <button type="submit" class="btn btn-outline-success w-100 rounded-pill btn-sm">
                                                 Modifier
@@ -249,6 +453,7 @@ $totalProduits = $frigoController->getNombreProduitsDansFrigo($idUtilisateur);
                         </div>
                     </div>
                 </div>
+
             <?php } ?>
         </div>
     <?php } ?>

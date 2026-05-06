@@ -1,6 +1,5 @@
 <?php
 require_once(__DIR__ . '/../Config.php');
-
 class FrigoController
 {
     public function ajouterAuFrigo($idUtilisateur, $idProduit, $quantite = 1)
@@ -347,5 +346,22 @@ public function getCategoriesLesPlusPresentes()
         die('Erreur: ' . $e->getMessage());
     }
 }
+
+//fct ia
+public function getProduitsByUser($idUtilisateur)
+{
+    $db = Config::getConnexion();
+
+    $sql = "SELECT p.nom 
+            FROM frigo f
+            JOIN produit p ON f.id_produit = p.id_produit
+            WHERE f.id_utilisateur = :id";
+
+    $query = $db->prepare($sql);
+    $query->execute(['id' => $idUtilisateur]);
+
+    return $query->fetchAll(PDO::FETCH_COLUMN);
+}
 }
 ?>
+//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

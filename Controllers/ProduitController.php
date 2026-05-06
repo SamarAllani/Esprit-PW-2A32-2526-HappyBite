@@ -600,7 +600,7 @@ class ProduitController
         return $query->fetch(PDO::FETCH_ASSOC);
     }
 
-    public function setProduitPromo($idProduit, $nouveauPrix)
+public function setProduitPromo($idProduit, $nouveauPrix)
 {
     $db = Config::getConnexion();
 
@@ -631,10 +631,12 @@ class ProduitController
         $sql = "UPDATE produit SET promo = :promo WHERE id_produit = :id_produit";
         $stmt = $db->prepare($sql);
 
-        $stmt->execute([
+        $result = $stmt->execute([
             'promo' => $nouveauPrix,
             'id_produit' => $idProduit
         ]);
+
+        
 
         return true;
 
@@ -643,15 +645,17 @@ class ProduitController
     }
 }
 
-    public function annulerPromoProduit($idProduit)
-    {
-        $sql = "UPDATE produit SET promo = NULL WHERE id_produit = :id_produit";
-        $db = Config::getConnexion();
-        $stmt = $db->prepare($sql);
+public function annulerPromoProduit($idProduit)
+{
+    $sql = "UPDATE produit SET promo = NULL WHERE id_produit = :id_produit";
+    $db = Config::getConnexion();
+    $stmt = $db->prepare($sql);
 
-        return $stmt->execute([
-            'id_produit' => $idProduit
-        ]);
-    }
+    return $stmt->execute([
+        'id_produit' => $idProduit
+    ]);
+}
+
+
 }
 ?>

@@ -2,6 +2,7 @@
 require_once '../../Controllers/ProduitController.php';
 require_once '../../Controllers/CategorieController.php';
 require_once '../../Controllers/FrigoController.php';
+require_once '../../Controllers/AiRecetteController.php';
 require_once '../../Config.php';
 
 $produitController = new ProduitController();
@@ -14,6 +15,8 @@ $action = $_GET['action'] ?? 'normal';
 $motCle = trim($_GET['motCle'] ?? '');
 $idCategorie = trim($_GET['id_categorie'] ?? '');
 
+$resultatIA = null;
+
 // PROFIL FIXE TEMPORAIRE
 $idUtilisateur = 12;
 
@@ -24,6 +27,20 @@ $stmt->execute([
 ]);
 $profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
 
+// IA BUDGET + SANTÉ
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_ia_budget'] ?? '') === 'alternative_budget') {
+    $produitCher = trim($_POST['produit_cher'] ?? '');
+    $budget = trim($_POST['budget'] ?? '');
+
+    if (!empty($produitCher)) {
+        $ai = new AiRecetteController();
+        $resultatIA = $ai->proposerAlternativeBudgetSante($produitCher, $budget, $profilSante);
+    } else {
+        $resultatIA = "Veuillez saisir un produit.";
+    }
+}
+
+// AJOUT AU FRIGO
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_frigo'] ?? '') === 'ajouter_frigo') {
     $idProduitAjout = (int)($_POST['id_produit'] ?? 0);
     $quantiteAjout = (int)($_POST['quantite'] ?? 1);
@@ -40,9 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_frigo'] ?? '') === 
 
     $queryString = http_build_query($queryParams);
     $redirectUrl = 'List-Produit.php';
+
     if (!empty($queryString)) {
         $redirectUrl .= '?' . $queryString;
     }
+
     $redirectUrl .= '#produit-' . $idProduitAjout;
 
     header('Location: ' . $redirectUrl);
@@ -176,6 +195,56 @@ if ($action === 'smart' && $profilSante) {
             Affichage normal de tous les produits
         </div>
     <?php } ?>
+
+    <!-- BLOC IA BUDGET + SANTÉ -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">🤖 Assistant intelligent Budget & Santé</h5>
+
+            <form method="POST">
+                <input type="hidden" name="action_ia_budget" value="alternative_budget">
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Produit cher ou interdit</label>
+                        <input
+                            type="text"
+                            name="produit_cher"
+                            class="form-control"
+                            placeholder="ex: saumon, lait, pain..."
+                            required
+                        >
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Budget disponible (DT)</label>
+                        <input
+                            type="number"
+                            name="budget"
+                            class="form-control"
+                            placeholder="ex: 20"
+                            min="0"
+                            step="0.1"
+                        >
+                    </div>
+
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">
+                            Trouver alternative
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <?php if (!empty($resultatIA)) { ?>
+                <div class="alert alert-info mt-3">
+                    <?php echo nl2br(htmlspecialchars($resultatIA)); ?>
+                </div>
+            <?php } ?>
+
+        </div>
+    </div>
 
     <div class="rayons-section mb-4">
         <div class="rayons-header mb-3">

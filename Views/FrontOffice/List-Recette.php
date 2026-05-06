@@ -1,8 +1,11 @@
 <?php
 require_once '../../Controllers/RecetteController.php';
+require_once '../../Controllers/AiRecetteController.php';
 require_once '../../Config.php';
 
 $recetteController = new RecetteController();
+
+$analyseIA = null;
 
 $action = $_GET['action'] ?? 'normal';
 $motCle = trim($_GET['motCle'] ?? '');
@@ -16,6 +19,14 @@ $stmt->execute([
     'id_utilisateur' => $idUtilisateur
 ]);
 $profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// TRAITEMENT IA PHOTO DIRECTEMENT DANS LA PAGE
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['image']['tmp_name'])) {
+    $imagePath = $_FILES['image']['tmp_name'];
+
+    $ai = new AiRecetteController();
+    $analyseIA = $ai->analyserPlatPhoto($imagePath, $profilSante);
+}
 
 if ($action === 'smart' && $profilSante) {
     $recettes = $recetteController->rechercherRecettesIntelligentes($idUtilisateur, $motCle);
@@ -78,6 +89,127 @@ usort($recettes, function ($a, $b) {
         <a href="?action=smart" class="btn btn-success rounded-pill px-4">
             Recettes personnalisées
         </a>
+    </div>
+
+    <!-- BLOC IA PHOTO -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">📸 Analyse ton plat</h5>
+
+            <form method="POST" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <input type="file" name="image" class="form-control" accept="image/*" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100">Analyser</button>
+                    </div>
+                </div>
+            </form>
+
+            <?php if (!empty($analyseIA)) { ?>
+    <?php
+    $analyseData = json_decode($analyseIA, true);
+
+    if (is_array($analyseData)) {
+        $niveau = strtolower($analyseData['niveau'] ?? 'orange');
+
+        $badgeClass = 'bg-warning text-dark';
+        if ($niveau === 'vert') {
+            $badgeClass = 'bg-success';
+        } elseif ($niveau === 'rouge') {
+            $badgeClass = 'bg-danger';
+        }
+    ?>
+
+        <div class="card border-0 shadow-sm mt-4 rounded-4">
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Résultat de l’analyse</h5>
+                    <span class="badge <?php echo $badgeClass; ?> rounded-pill px-3 py-2">
+                        Score : <?php echo htmlspecialchars($analyseData['score_sante'] ?? '-'); ?>/10
+                    </span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded-4 text-center">
+                            <strong>Calories</strong><br>
+                            <span class="text-success fw-bold">
+                                <?php echo htmlspecialchars($analyseData['calories_estimees'] ?? '-'); ?> kcal
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded-4 text-center">
+                            <strong>Protéines</strong><br>
+                            <?php echo htmlspecialchars($analyseData['proteines'] ?? '-'); ?>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded-4 text-center">
+                            <strong>Glucides</strong><br>
+                            <?php echo htmlspecialchars($analyseData['glucides'] ?? '-'); ?>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded-4 text-center">
+                            <strong>Lipides</strong><br>
+                            <?php echo htmlspecialchars($analyseData['lipides'] ?? '-'); ?>
+                        </div>
+                    </div>
+                </div>
+
+                <p><strong>Ingrédients détectés :</strong></p>
+                <div class="mb-3">
+                    <?php foreach (($analyseData['ingredients_detectes'] ?? []) as $ingredient) { ?>
+                        <span class="badge bg-success me-1 mb-1">
+                            <?php echo htmlspecialchars($ingredient); ?>
+                        </span>
+                    <?php } ?>
+                </div>
+
+                <p><strong>Analyse :</strong></p>
+                <p class="text-muted">
+                    <?php echo htmlspecialchars($analyseData['analyse'] ?? ''); ?>
+                </p>
+
+                <p><strong>Comment rééquilibrer :</strong></p>
+                <ul>
+                    <?php foreach (($analyseData['reequilibrage'] ?? []) as $conseil) { ?>
+                        <li><?php echo htmlspecialchars($conseil); ?></li>
+                    <?php } ?>
+                </ul>
+
+                <div class="alert alert-light border mt-3">
+                    <strong>Sport conseillé :</strong><br>
+                    <?php echo htmlspecialchars($analyseData['sport_conseille'] ?? ''); ?>
+                </div>
+
+                <?php if (!empty($analyseData['avertissement_sante'])) { ?>
+                    <div class="alert alert-warning mt-3">
+                        <strong>Attention santé :</strong><br>
+                        <?php echo htmlspecialchars($analyseData['avertissement_sante']); ?>
+                    </div>
+                <?php } ?>
+
+            </div>
+        </div>
+
+    <?php } else { ?>
+        <div class="alert alert-success mt-3">
+            <?php echo nl2br(htmlspecialchars($analyseIA)); ?>
+        </div>
+    <?php } ?>
+<?php } ?>
+
+        </div>
     </div>
 
     <?php if ($action === 'smart' && $profilSante) { ?>
