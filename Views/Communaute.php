@@ -3,9 +3,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../Controllers/PostController.php';
 require_once __DIR__ . '/../Controllers/CommentaireController.php';
+require_once __DIR__ . '/../Controllers/StoryController.php';
+require_once __DIR__ . '/../Controllers/GeminiController.php';
 
 $postController = new PostController();
 $commentaireController = new CommentaireController();
+$storyController = new StoryController();
 
 $message = '';
 $messageType = '';
@@ -15,6 +18,7 @@ if (isset($_GET['updated'])) { $message = 'Post mis à jour avec succès !'; $me
 if (isset($_GET['comment_success'])) { $message = 'Commentaire ajouté avec succès !'; $messageType = 'success'; }
 if (isset($_GET['comment_updated'])) { $message = 'Commentaire mis à jour avec succès !'; $messageType = 'success'; }
 if (isset($_GET['comment_deleted'])) { $message = 'Commentaire supprimé avec succès !'; $messageType = 'success'; }
+if (isset($_GET['story_success'])) { $message = 'Story ajoutée avec succès !'; $messageType = 'success'; }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $isAjax = isset($_POST['ajax']) && $_POST['ajax'] === '1';
@@ -23,6 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $contenu = $_POST['contenu'] ?? '';
         if (!empty($contenu)) {
             $image = null;
+            if (!empty($_POST['ai_image'])) {
+                $image = $_POST['ai_image']; // Use AI generated image
+            }
             if (!empty($_FILES['image']['name'])) {
                 $uploadsDir = __DIR__ . '/../uploads/';
                 if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
@@ -74,10 +81,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($isAjax) { echo json_encode(['success' => true, 'id' => $id]); exit; }
             header('Location: Communaute.php?comment_deleted=1'); exit;
         } else { $message = 'Erreur lors de la suppression du commentaire.'; $messageType = 'danger'; }
+    } elseif ($_POST['action'] === 'add_story') {
+        if (!empty($_FILES['image']['name'])) {
+            $uploadsDir = __DIR__ . '/../uploads/';
+            if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
+            $image = uniqid() . '-story-' . $_FILES['image']['name'];
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadsDir . $image)) {
+                $storyController->create($image);
+                header('Location: Communaute.php?story_success=1'); exit;
+            }
+        }
+        $message = 'Erreur lors de l\'ajout de la story.'; $messageType = 'danger';
+    } elseif ($_POST['action'] === 'delete_story') {
+        $id = (int)$_POST['id'];
+        if ($storyController->delete($id)) {
+            if ($isAjax) { echo json_encode(['success' => true, 'id' => $id]); exit; }
+            header('Location: Communaute.php?story_deleted=1'); exit;
+        } else {
+            if ($isAjax) { echo json_encode(['success' => false]); exit; }
+            $message = 'Erreur lors de la suppression de la story.'; $messageType = 'danger';
+        }
+    } elseif ($_POST['action'] === 'generate_image') {
+        $promptText = urlencode("delicious realistic food photography of " . ($_POST['prompt'] ?? 'food') . " highly detailed 4k");
+        $url = "https://image.pollinations.ai/prompt/" . $promptText . "?width=800&height=800&nologo=true";
+        $imageContent = @file_get_contents($url);
+        if ($imageContent) {
+            $uploadsDir = __DIR__ . '/../uploads/';
+            if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
+            $imageName = uniqid() . '-ai.jpg';
+            file_put_contents($uploadsDir . $imageName, $imageContent);
+            if ($isAjax) { echo json_encode(['success' => true, 'image' => $imageName]); exit; }
+        } else {
+            if ($isAjax) { echo json_encode(['success' => false, 'message' => 'Erreur de génération d\'image']); exit; }
+        }
     }
 }
 
+// Load ALL posts — no pagination
 $posts = $postController->getAll();
+$stories = $storyController->getActiveStories();
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -184,13 +226,11 @@ $posts = $postController->getAll();
 
         /* ── LAYOUT ── */
         .page-layout {
-            max-width: 1100px; margin: 0 auto; padding: 36px 20px;
-            display: grid; grid-template-columns: 1fr 320px; gap: 28px;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 28px 16px;
         }
-        @media (max-width: 860px) {
-            .page-layout { grid-template-columns: 1fr; }
-            .sidebar-col { order: -1; }
-        }
+        .feed-col { width: 100%; }
 
         /* ── SIDEBAR ── */
         .sidebar-widget {
@@ -451,61 +491,375 @@ $posts = $postController->getAll();
         .comments-section::-webkit-scrollbar { width: 4px; }
         .comments-section::-webkit-scrollbar-track { background: transparent; }
         .comments-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* ── STORIES ── */
+        .stories-wrapper {
+            background: var(--card-bg); border-radius: var(--radius);
+            padding: 16px 20px; box-shadow: var(--shadow); margin-bottom: 24px;
+        }
+        .stories-wrapper h6 {
+            font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 14px;
+        }
+        .stories-container {
+            display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+        .stories-container::-webkit-scrollbar { display: none; }
+        .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; flex-shrink: 0; }
+        .story-ring {
+            width: 62px; height: 62px; border-radius: 50%; padding: 2.5px;
+            background: linear-gradient(45deg, #f0a500, var(--green), #6dbf9e);
+        }
+        .story-ring.add-ring { background: none; border: 2px dashed var(--green); }
+        .story-ring-inner {
+            width: 100%; height: 100%; border-radius: 50%; border: 2px solid #fff;
+            overflow: hidden; background: var(--green-light);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .story-ring-inner img { width: 100%; height: 100%; object-fit: cover; }
+        .story-ring-inner .add-icon { font-size: 1.3rem; color: var(--green); }
+        .story-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); max-width: 62px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ── STORY VIEWER (Instagram-style) ── */
+        .story-viewer-overlay {
+            display: none; position: fixed; inset: 0; z-index: 3000;
+            background: rgba(0,0,0,0.88); align-items: center; justify-content: center;
+        }
+        .story-viewer-overlay.show { display: flex; animation: fadeIn 0.2s ease; }
+        .story-phone {
+            width: 340px; max-height: 90vh;
+            border-radius: 28px; overflow: hidden;
+            background: #111; position: relative;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+            display: flex; flex-direction: column;
+        }
+        .story-phone-header {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+            padding: 16px 16px 10px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
+        }
+        .story-progress-bar {
+            height: 3px; background: rgba(255,255,255,0.35); border-radius: 2px; margin-bottom: 12px;
+        }
+        .story-progress-fill {
+            height: 100%; background: #fff; border-radius: 2px;
+            animation: storyProgress 5s linear forwards;
+        }
+        @keyframes storyProgress { from { width: 0; } to { width: 100%; } }
+        .story-phone-user { display: flex; align-items: center; gap: 10px; }
+        .story-user-avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--green), #6dbf9e);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+            border: 2px solid rgba(255,255,255,0.6);
+        }
+        .story-user-name { color: #fff; font-weight: 700; font-size: 0.88rem; }
+        .story-user-time { color: rgba(255,255,255,0.7); font-size: 0.72rem; }
+        .story-close-btn {
+            position: absolute; top: 14px; right: 14px; z-index: 20;
+            background: rgba(0,0,0,0.4); border: none; color: #fff;
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .story-close-btn:hover { background: rgba(0,0,0,0.7); }
+        .story-img-wrap { flex: 1; position: relative; min-height: 500px; }
+        .story-img-wrap img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .story-phone-footer {
+            position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+            padding: 12px 16px 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+            display: flex; align-items: center; justify-content: flex-end;
+        }
+        .story-delete-btn {
+            background: rgba(239,68,68,0.85); border: none; color: #fff;
+            padding: 7px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; display: flex; align-items: center; gap: 6px;
+            transition: background 0.2s;
+        }
+        .story-delete-btn:hover { background: #ef4444; }
+        
+        .ai-btn { background: linear-gradient(135deg, #8a2be2, #4b0082); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .ai-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .pdf-btn { display: inline-flex; align-items: center; gap: 8px; color: #ef4444; background: #fef2f2; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: 1px solid #fecaca; transition: all 0.2s; cursor: pointer; margin-bottom: 15px; }
+        .pdf-btn:hover { background: #fee2e2; color: #dc2626; }
+
+        .translate-dropdown { font-size: 0.75rem; border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; background: #fff; color: var(--text-muted); cursor: pointer; outline: none; transition: all 0.2s; }
+        .translate-dropdown:hover { border-color: var(--green); color: var(--green); }
+
+        :root {
+    --hb-forest: #2c7e34;
+    --hb-forest-mid: #256b2d;
+    --hb-mint: #2ec4b6;
+    --hb-page-bg: #f4f7f5;
+    --hb-card-border: #e3ebe6;
+    --hb-green-accent: #2c7e34;
+}
+
+        .main-nav .nav-link:hover {
+            color: var(--hb-forest-mid);
+            border-bottom-color: rgba(37, 107, 45, 0.4);
+        }
+
+        .main-nav .nav-link.nav-link-active:hover {
+            color: var(--hb-forest-mid);
+            border-bottom-color: var(--hb-forest);
+        }
+
+        .main-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    min-height: 78px;
+    padding: 8px 120px 8px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--hb-card-border);
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-decoration: none;
+    color: var(--hb-forest);
+}
+
+.nav-brand-logo {
+    display: block;
+    width: auto;
+    height: 75px;
+    object-fit: contain;
+    border-radius: 14px;
+}
+
+.nav-links-wrap {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 22px;
+}
+
+.nav-link {
+    color: var(--hb-forest);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 8px 2px 10px;
+    border-bottom: 3px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-link.nav-link-active {
+    border-bottom-color: var(--hb-forest);
+}
+
+.nav-icons {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-cart-link {
+    display: block;
+    line-height: 0;
+    flex-shrink: 0;
+}
+
+/* Icon + (hidden) label pattern for the right-side nav icons */
+.nav-icon-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px 8px;
+    border-bottom: 3px solid transparent;
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.nav-icon-label {
+    line-height: 1;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--hb-forest);
+    white-space: nowrap;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateX(-4px);
+    transition: max-width 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nav-icon-link:hover .nav-icon-label,
+.nav-icon-link.nav-icon-active .nav-icon-label,
+.nav-profile-dropdown.nav-icon-active .nav-icon-label,
+.nav-profile-dropdown[open] .nav-icon-label {
+    max-width: 120px;
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.nav-icon-link.nav-icon-active,
+.nav-profile-dropdown.nav-icon-active > .nav-profile-trigger,
+.nav-profile-dropdown[open] > .nav-profile-trigger {
+    border-bottom-color: var(--hb-forest);
+}
+
+.nav-cart-link:hover {
+    opacity: 0.9;
+}
+
+.nav-cart-img {
+    display: block;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.nav-profile-dropdown {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.nav-profile-trigger {
+    list-style: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    line-height: 0;
+}
+
+.nav-profile-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.nav-profile-img {
+    display: block;
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+
+@media (max-width: 600px) {
+    .nav-brand-logo {
+        width: auto;
+        height: 84px;
+    }
+
+    .main-nav {
+        min-height: 68px;
+    }
+
+    .nav-link {
+        font-size: 13px;
+    }
+}
+
+.nav-profile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 160px;
+    padding: 8px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nav-profile-btn {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.nav-profile-signup {
+    background-color: var(--hb-forest);
+    color: #fff;
+}
+
+.nav-profile-signup:hover {
+    filter: brightness(1.05);
+}
+
+.nav-profile-login {
+    background-color: #fff;
+    color: var(--hb-forest);
+    border: 2px solid var(--hb-forest);
+}
+
+.nav-profile-login:hover {
+    background-color: #eef5f1;
+}
+
     </style>
 </head>
 <body>
 
-<nav class="main-navbar">
-    <div class="nav-container">
-        <a href="Home.php" class="nav-logo">
-            <img src="assets/logo.png" alt="HappyBite">
-            <span>HappyBite</span>
-        </a>
-        <ul class="nav-links">
-            <li><a href="Home.php">Accueil</a></li>
-            <li><a href="List-Produit.php">Produits</a></li>
-            <li><a href="List-Recette.php">Recettes</a></li>
-            <li><a href="Communaute.php" class="active">Communaute</a></li>
-        </ul>
-        <div class="nav-user">
-            <a href="List-Frigo.php" class="nav-action">Frigo</a>
-            <a href="#" class="nav-action">Commandes</a>
-            <a href="#" class="nav-action">Sante</a>
-            <a href="#" class="nav-action">Profil</a>
-        </div>
-    </div>
-</nav>
+<?php
+$nav_active = 'communaute';
+require __DIR__ . '/includes/nav_front.php';
+?>
 
-<!-- HERO -->
-<div class="community-hero">
-    <div class="hero-inner">
-        <h1><i class="fas fa-seedling me-2"></i>Communaute HappyBite</h1>
-        <p>Partagez vos decouvertes culinaires, inspirez et soyez inspire par notre communaute.</p>
-        <div class="hero-stats">
-            <div class="hero-stat">
-                <span class="stat-num"><?php echo count($posts); ?></span>
-                <span class="stat-label">Posts</span>
-            </div>
-            <div class="hero-stat">
-                <span class="stat-num"><?php echo array_sum(array_column($posts, 'nombreLikes')); ?></span>
-                <span class="stat-label">J aime</span>
-            </div>
-            <div class="hero-stat">
-                <span class="stat-num"><?php
-                    $totalComments = 0;
-                    foreach ($posts as $p) $totalComments += count($commentaireController->getByPostId($p['id']));
-                    echo $totalComments;
-                ?></span>
-                <span class="stat-label">Commentaires</span>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- MAIN LAYOUT -->
 <div class="page-layout">
     <!-- FEED COLUMN -->
-    <div class="feed-col">
+    <div class="feed-col" id="pdf-export-area">
+        
+        <!-- STORIES -->
+        <div class="stories-wrapper">
+            <h6><i class="fas fa-circle-notch me-2"></i>Stories</h6>
+            <div class="stories-container">
+                <!-- Add story -->
+                <div class="story-item" onclick="openStoryUploadModal()">
+                    <div class="story-ring add-ring">
+                        <div class="story-ring-inner">
+                            <span class="add-icon"><i class="fas fa-plus"></i></span>
+                        </div>
+                    </div>
+                    <span class="story-label">Ajouter</span>
+                </div>
+                <?php if (!empty($stories)): foreach($stories as $s): ?>
+                <div class="story-item" onclick="viewStory(<?php echo $s['id']; ?>, '<?php echo htmlspecialchars($s['image']); ?>', '<?php echo date('H:i', strtotime($s['dateCreation'])); ?>')">
+                    <div class="story-ring">
+                        <div class="story-ring-inner">
+                            <img src="../uploads/<?php echo htmlspecialchars($s['image']); ?>" alt="Story">
+                        </div>
+                    </div>
+                    <span class="story-label">HappyBite</span>
+                </div>
+                <?php endforeach; endif; ?>
+            </div>
+        </div>
+        </div>
 
         <?php if (!empty($message)): ?>
         <div class="alert toast-alert alert-<?php echo htmlspecialchars($messageType); ?> alert-dismissible fade show" role="alert">
@@ -530,10 +884,13 @@ $posts = $postController->getAll();
                     <button type="button" class="remove-preview" onclick="removeImagePreview()"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="post-toolbar">
-                    <label for="postImage" class="file-label">
-                        <i class="fas fa-image"></i> Ajouter une photo
-                    </label>
-                    <input type="file" id="postImage" name="image" accept="image/*" onchange="previewImage(this)">
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <label for="postImage" class="file-label">
+                            <i class="fas fa-image"></i> Ajouter une photo
+                        </label>
+                        <input type="file" id="postImage" name="image" accept="image/*" onchange="previewImage(this)">
+                        <button type="button" class="ai-btn" onclick="generateWithAI(this)"><i class="fas fa-magic"></i> IA</button>
+                    </div>
                     <button type="submit" class="btn-publish">
                         <i class="fas fa-paper-plane"></i> Publier
                     </button>
@@ -542,8 +899,8 @@ $posts = $postController->getAll();
         </div>
 
         <!-- POSTS FEED -->
+
         <?php if (empty($posts)): ?>
-        <div class="empty-state">
             <div class="empty-icon"><i class="fas fa-seedling"></i></div>
             <h5>Aucun post pour le moment</h5>
             <p>Soyez le premier a partager quelque chose avec la communaute !</p>
@@ -601,13 +958,19 @@ $posts = $postController->getAll();
                                     <span class="comment-date"><?php echo date('d M Y a H:i', strtotime($comment['dateCommentaire'])); ?></span>
                                 </div>
                                 <p class="comment-text" id="comment-content-<?php echo $comment['id']; ?>"><?php echo htmlspecialchars($comment['contenu']); ?></p>
-                                <div class="comment-actions-row">
+                                <div class="comment-actions-row" style="align-items:center; flex-wrap:wrap;">
                                     <button class="comment-action-link" onclick='openEditCommentModal(<?php echo $comment['id']; ?>, "<?php echo addslashes($comment['contenu']); ?>")'>
                                         <i class="fas fa-edit"></i> Modifier
                                     </button>
                                     <button class="comment-action-link danger" onclick="openDeleteCommentConfirmation(<?php echo $comment['id']; ?>)">
                                         <i class="fas fa-trash"></i> Supprimer
                                     </button>
+                                    <select class="translate-dropdown" onchange="translateComment(<?php echo $comment['id']; ?>, this.value, this)">
+                                        <option value="">Traduire...</option>
+                                        <option value="fr">Français</option>
+                                        <option value="en">English</option>
+                                        <option value="ar">العربية</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -628,11 +991,12 @@ $posts = $postController->getAll();
                 </div>
             </div>
             <?php endforeach; ?>
+
         <?php endif; ?>
     </div>
 
-    <!-- SIDEBAR -->
-    <div class="sidebar-col">
+    <!-- SIDEBAR hidden — single column layout -->
+    <div class="sidebar-col" style="display:none;">
         <div class="sidebar-widget">
             <h6><i class="fas fa-lightbulb me-2"></i>Conseils de la communaute</h6>
             <div class="sidebar-tip">
@@ -722,6 +1086,90 @@ $posts = $postController->getAll();
         </div>
     </div>
 </div>
+
+<div id="uploadStoryModal" class="modal-custom">
+    <div class="modal-custom-content">
+        <div class="modal-icon" style="color:var(--green);">&#43;</div>
+        <h4>Ajouter une Story</h4>
+        <?php
+        // PHP server-side story validation errors
+        $storyError = '';
+        if (isset($_POST['action']) && $_POST['action'] === 'add_story_validate') {
+            if (empty($_FILES['story_image']['name'])) {
+                $storyError = 'Veuillez sélectionner une image.';
+            } elseif ($_FILES['story_image']['size'] > 5 * 1024 * 1024) {
+                $storyError = 'L\'image ne doit pas dépasser 5 Mo.';
+            } else {
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_file($finfo, $_FILES['story_image']['tmp_name']);
+                finfo_close($finfo);
+                if (!in_array($mimeType, $allowedTypes)) {
+                    $storyError = 'Format non supporté. Utilisez JPG, PNG, GIF ou WebP.';
+                }
+            }
+        }
+        ?>
+        <?php if (!empty($storyError)): ?>
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:0.85rem;border-radius:8px;">
+                <i class="fas fa-exclamation-circle me-1"></i><?php echo htmlspecialchars($storyError); ?>
+            </div>
+        <?php endif; ?>
+        <form id="addStoryForm" method="POST" enctype="multipart/form-data" onsubmit="return validateStoryPHP(this)">
+            <input type="hidden" name="action" value="add_story">
+            <div style="margin-bottom:15px;">
+                <label class="file-label w-100 justify-content-center" for="storyImageInput" style="border-radius:10px;padding:20px;">
+                    <i class="fas fa-image fa-lg"></i>
+                    <span id="storyFileName">Choisir une image (JPG, PNG, GIF, WebP — max 5 Mo)</span>
+                </label>
+                <input type="file" id="storyImageInput" name="image" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;"
+                       onchange="updateStoryFileName(this)">
+            </div>
+            <div id="storyPreviewWrap" style="display:none;text-align:center;margin-bottom:12px;">
+                <img id="storyPreviewImg" src="" style="max-height:160px;border-radius:10px;border:2px solid var(--border);">
+            </div>
+            <div id="storyFormError" class="error-message mb-2"></div>
+            <div class="modal-footer-btns">
+                <button type="submit" class="btn btn-green">Publier la story</button>
+                <button type="button" class="btn btn-secondary" onclick="closeStoryUploadModal()">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Story Viewer — Instagram style -->
+<div id="storyViewerOverlay" class="story-viewer-overlay" onclick="closeViewStoryModal()">
+    <div class="story-phone" onclick="event.stopPropagation()">
+        <!-- Progress bar -->
+        <div class="story-phone-header">
+            <div class="story-progress-bar">
+                <div class="story-progress-fill" id="storyProgressFill"></div>
+            </div>
+            <div class="story-phone-user">
+                <div class="story-user-avatar">HB</div>
+                <div>
+                    <div class="story-user-name">HappyBite</div>
+                    <div class="story-user-time" id="storyTime"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Close -->
+        <button class="story-close-btn" onclick="closeViewStoryModal()"><i class="fas fa-times"></i></button>
+        <!-- Image -->
+        <div class="story-img-wrap">
+            <img id="storyViewerImg" src="" alt="Story">
+        </div>
+        <!-- Footer with delete -->
+        <div class="story-phone-footer">
+            <button class="story-delete-btn" id="deleteStoryBtn">
+                <i class="fas fa-trash"></i> Supprimer
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- html2pdf for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -887,16 +1335,187 @@ function confirmDeleteComment() {
 }
 
 window.onclick = function(e) {
-    ['editPostModal','deleteConfirmationModal','editCommentModal','deleteCommentConfirmationModal'].forEach(id => {
+    ['editPostModal','deleteConfirmationModal','editCommentModal','deleteCommentConfirmationModal','uploadStoryModal','viewStoryModal'].forEach(id => {
         const m = document.getElementById(id);
         if (e.target === m) m.classList.remove('show');
     });
 };
 
+function openStoryUploadModal() { document.getElementById('uploadStoryModal').classList.add('show'); }
+function closeStoryUploadModal() { document.getElementById('uploadStoryModal').classList.remove('show'); }
+
+function updateStoryFileName(input) {
+    const label = document.getElementById('storyFileName');
+    const preview = document.getElementById('storyPreviewWrap');
+    const previewImg = document.getElementById('storyPreviewImg');
+    if (input.files && input.files[0]) {
+        label.textContent = input.files[0].name;
+        const reader = new FileReader();
+        reader.onload = e => { previewImg.src = e.target.result; preview.style.display = 'block'; };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function validateStoryPHP(form) {
+    const input = document.getElementById('storyImageInput');
+    const errEl = document.getElementById('storyFormError');
+    errEl.textContent = '';
+    if (!input.files || !input.files[0]) {
+        errEl.textContent = 'Veuillez sélectionner une image.';
+        return false;
+    }
+    const file = input.files[0];
+    const allowed = ['image/jpeg','image/png','image/gif','image/webp'];
+    if (!allowed.includes(file.type)) {
+        errEl.textContent = 'Format non supporté. Utilisez JPG, PNG, GIF ou WebP.';
+        return false;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        errEl.textContent = "L'image ne doit pas dépasser 5 Mo.";
+        return false;
+    }
+    return true;
+}
+
+let storyProgressTimer = null;
+
+function viewStory(id, image, time) {
+    document.getElementById('storyViewerImg').src = '../uploads/' + image;
+    document.getElementById('storyTime').textContent = time || '';
+    document.getElementById('deleteStoryBtn').onclick = function() { deleteStory(id); };
+    // Reset and restart progress bar
+    const fill = document.getElementById('storyProgressFill');
+    fill.style.animation = 'none';
+    fill.offsetHeight; // reflow
+    fill.style.animation = 'storyProgress 5s linear forwards';
+    document.getElementById('storyViewerOverlay').classList.add('show');
+    // Auto-close after 5s
+    clearTimeout(storyProgressTimer);
+    storyProgressTimer = setTimeout(closeViewStoryModal, 5000);
+}
+function closeViewStoryModal() {
+    clearTimeout(storyProgressTimer);
+    document.getElementById('storyViewerOverlay').classList.remove('show');
+}
+
+function deleteStory(id) {
+    if(confirm("Supprimer cette story ?")) {
+        fetch('Communaute.php', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=delete_story&ajax=1&id=' + id
+        }).then(r => r.json()).then(data => {
+            if(data.success) { location.reload(); }
+            else alert('Erreur lors de la suppression.');
+        }).catch(err => alert('Erreur'));
+    }
+}
+
+function generateWithAI(btn) {
+    const promptText = prompt("Quel plat souhaitez-vous générer en image (ex: Pizza margherita, Burger gastronomique) ?");
+    if (!promptText) return;
+    
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+    btn.disabled = true;
+    
+    fetch('Communaute.php', {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'action=generate_image&ajax=1&prompt=' + encodeURIComponent(promptText)
+    }).then(r => r.json()).then(data => {
+        if(data.success) {
+            document.getElementById('imagePreview').src = '../uploads/' + data.image;
+            document.getElementById('imagePreviewWrap').style.display = 'inline-block';
+            let aiInput = document.getElementById('aiGeneratedImage');
+            if(!aiInput) {
+                aiInput = document.createElement('input');
+                aiInput.type = 'hidden';
+                aiInput.name = 'ai_image';
+                aiInput.id = 'aiGeneratedImage';
+                document.getElementById('addPostForm').appendChild(aiInput);
+            }
+            aiInput.value = data.image;
+        } else {
+            alert('Erreur: ' + data.message);
+        }
+    }).catch(err => alert('Erreur de génération d\'image')).finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function translateComment(commentId, targetLang, selectEl) {
+    if(!targetLang) return;
+    const contentEl = document.getElementById('comment-content-' + commentId);
+    // Save original text BEFORE modifying innerHTML
+    const originalText = contentEl.innerText || contentEl.textContent;
+    contentEl.innerHTML = '<i class="fas fa-spinner fa-spin text-muted"></i> Traduction en cours...';
+    
+    fetch('../Controllers/GeminiController.php', {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'action=translate&lang=' + encodeURIComponent(targetLang) + '&text=' + encodeURIComponent(originalText)
+    }).then(r => r.json()).then(data => {
+        if(data.success && data.text) {
+            contentEl.textContent = data.text;
+            // Remove old badge if exists
+            const oldBadge = document.getElementById('badge-trans-' + commentId);
+            if (oldBadge) oldBadge.remove();
+            const badge = document.createElement('span');
+            badge.id = 'badge-trans-' + commentId;
+            badge.style.cssText = 'font-size:0.72rem;color:var(--green);font-style:italic;margin-left:6px;';
+            badge.textContent = '(traduit)';
+            contentEl.appendChild(badge);
+        } else {
+            contentEl.textContent = originalText;
+            const msg = data.message || 'Traduction impossible.';
+            contentEl.insertAdjacentHTML('afterend', `<span style="font-size:0.75rem;color:#ef4444;">${msg}</span>`);
+            setTimeout(() => { const err = contentEl.nextSibling; if(err && err.nodeType===1) err.remove(); }, 3000);
+        }
+    }).catch(() => {
+        contentEl.textContent = originalText;
+    }).finally(() => {
+        selectEl.value = '';
+    });
+}
+
+function exportToPDF() {
+    const element = document.getElementById('pdf-export-area');
+    const opt = {
+      margin:       0.5,
+      filename:     'Communaute_HappyBite.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+
 // Add fadeOut keyframe dynamically
 const style = document.createElement('style');
 style.textContent = '@keyframes fadeOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-10px); } }';
 document.head.appendChild(style);
+
+function exportToPDF() {
+    const btn = document.querySelector('[onclick="exportToPDF()"]');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+    btn.disabled = true;
+
+    const element = document.getElementById('pdf-export-area');
+    const opt = {
+        margin:      [10, 10, 10, 10],
+        filename:    'Communaute_HappyBite.pdf',
+        image:       { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, ignoreElements: el => el.hasAttribute('data-html2canvas-ignore') },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }).catch(() => {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    });
+}
 </script>
 </body>
 </html>

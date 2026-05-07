@@ -53,6 +53,11 @@
                         <i class="fas fa-shopping-cart me-1"></i>Commandes
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="../Home.php" title="Retourner au site public">
+                        <i class="fas fa-globe me-1"></i>Site Public
+                    </a>
+                </li>
             </ul>
         </div>
     </div>

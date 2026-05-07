@@ -11,6 +11,19 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" type="text/css" href="css/style.css">
+    <style>
+        @media print {
+            body { background: #fff !important; }
+            .admin-sidebar, .navbar, footer,
+            #exportPdfBtn, [data-html2canvas-ignore],
+            .btn, .input-group, .card-header .btn { display: none !important; }
+            .admin-layout { display: block !important; }
+            .admin-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+            .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
+            .table { font-size: 11px !important; }
+            canvas { display: none !important; }
+        }
+    </style>
 </head>
 <body>
 
@@ -56,6 +69,11 @@
                 <li class="nav-item">
                     <a class="nav-link" href="list-com-liv.php">
                         <i class="fas fa-shopping-cart me-1"></i>Commandes
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="../Home.php" title="Retourner au site public">
+                        <i class="fas fa-globe me-1"></i>Site Public
                     </a>
                 </li>
             </ul>
@@ -161,6 +179,14 @@ if (!empty($motCle)) {
                         <span class="badge bg-primary fs-6 px-3 py-2" id="resultCount"><?php echo count($posts); ?></span>
                         <span class="text-muted small">résultats</span>
                     </div>
+                </div>
+                <div class="col-12 col-md-auto ms-md-auto d-flex align-items-end">
+                    <a href="export_posts_pdf.php" target="_blank"
+                       class="btn d-flex align-items-center gap-2 fw-semibold px-4"
+                       style="white-space:nowrap; border-radius:10px; padding-top:10px; padding-bottom:10px; background:#2f6f57; color:#fff; border:none;">
+                        <i class="fas fa-file-pdf" style="font-size:1.1rem;"></i>
+                        <span>Exporter en PDF</span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -532,7 +558,19 @@ function filterAndSort() {
     makeChart('commentsChart',   cm.labels, cm.values, commentPalette);
     makeLegend('commentsLegend', cm.labels, cm.values, commentPalette, cm.values.some(v=>v>0));
 })();
-</script>
 
+function exportPostsToPDF() {
+    const element = document.querySelector('.admin-content');
+    const opt = {
+      margin:       0.5,
+      filename:     'BackOffice_Posts.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 </html>

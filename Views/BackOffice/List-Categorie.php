@@ -9,13 +9,29 @@
         <div class="collapse navbar-collapse" id="navbarBack">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="List-Produit.php">Produits</a>
+                    <a class="nav-link" href="dashboard.php">
+                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="List-Recette.php">Recettes</a>
+                    <a class="nav-link" href="List-Produit.php">
+                        <i class="fas fa-box me-1"></i>Produits
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="List-Categorie.php">Catégories</a>
+                    <a class="nav-link" href="List-Recette.php">
+                        <i class="fas fa-utensils me-1"></i>Recettes
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="List-Categorie.php">
+                        <i class="fas fa-tags me-1"></i>Catégories
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="../Home.php" title="Retourner au site public">
+                        <i class="fas fa-globe me-1"></i>Site Public
+                    </a>
                 </li>
             </ul>
         </div>

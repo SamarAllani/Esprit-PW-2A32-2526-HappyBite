@@ -128,6 +128,7 @@ $imgDelete = is_file(__DIR__ . '/images/delete.png') ? 'images/delete.png' : 'im
         <a href="List-Recette.php">Recettes</a>
         <a href="List-Categorie.php">Catégories</a>
         <a href="list-com-liv.php" class="nav-link-active">Commandes &amp; livraison</a>
+        <a href="../Home.php" title="Retourner au site public" style="color: #4CAF50; font-weight: bold;">🌐 Site Public</a>
     </div>
 </nav>
 

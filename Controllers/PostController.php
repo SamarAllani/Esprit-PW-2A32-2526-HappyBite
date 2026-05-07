@@ -32,16 +32,33 @@ class PostController
     }
 
     /**
-     * Récupère tous les posts triés par date décroissante
+     * Récupère tous les posts triés par date décroissante avec pagination
      */
-    public function getAll(): array
+    public function getAll(int $limit = 10, int $offset = 0): array
     {
         try {
-            $query = "SELECT * FROM Post ORDER BY datePublication DESC";
-            $stmt = $this->db->query($query);
+            $query = "SELECT * FROM Post ORDER BY datePublication DESC LIMIT :limit OFFSET :offset";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
             return $stmt->fetchAll();
         } catch (PDOException $e) {
             return [];
+        }
+    }
+
+    /**
+     * Récupère le nombre total de posts pour la pagination
+     */
+    public function getTotalCount(): int
+    {
+        try {
+            $query = "SELECT COUNT(*) FROM Post";
+            $stmt = $this->db->query($query);
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;
         }
     }
 

@@ -58,6 +58,11 @@
                         <i class="fas fa-shopping-cart me-1"></i>Commandes
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="../Home.php" title="Retourner au site public">
+                        <i class="fas fa-globe me-1"></i>Site Public
+                    </a>
+                </li>
             </ul>
         </div>
     </div>
@@ -234,7 +239,7 @@ usort($comments, function($a, $b) {
                                     <td class="border-0 text-center align-middle">
                                         <div class="btn-group" role="group">
                                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                                onclick="viewCommentDetails('<?php echo htmlspecialchars(addslashes($comment['contenu'])); ?>', '<?php echo date('d/m/Y H:i', strtotime($comment['dateCommentaire'])); ?>')"
+                                                onclick='viewCommentDetails(<?php echo htmlspecialchars(json_encode($comment['contenu'])); ?>, "<?php echo date('d/m/Y H:i', strtotime($comment['dateCommentaire'])); ?>")'
                                                 title="Voir les détails">
                                                 <i class="fas fa-eye"></i>
                                             </button>

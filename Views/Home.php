@@ -260,6 +260,9 @@ declare(strict_types=1);
             <a href="#" class="nav-action">Commandes</a>
             <a href="#" class="nav-action">Santé</a>
             <a href="#" class="nav-action">Profil</a>
+            <a href="BackOffice/dashboard.php" class="nav-action" title="Accéder à l'administration">
+                <i class="fas fa-cog me-1"></i>Admin
+            </a>
         </div>
     </div>
 </nav>
