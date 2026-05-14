@@ -21,7 +21,7 @@ $categories = $categorieController->listCategories();
 $recetteIA = null;
 $menuArray = [];
 
-$profilSante = false;
+$profilSante = null;
 if ($loggedIn && $idUtilisateur > 0) {
     if (isset($_SESSION['chefbot_menu'][$idUtilisateur])) {
         $recetteIA = $_SESSION['chefbot_menu'][$idUtilisateur];
@@ -36,7 +36,8 @@ if ($loggedIn && $idUtilisateur > 0) {
         LIMIT 1
     ');
     $stmt->execute(['id_utilisateur' => $idUtilisateur]);
-    $profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
+    $rowProfil = $stmt->fetch(PDO::FETCH_ASSOC);
+    $profilSante = is_array($rowProfil) ? $rowProfil : null;
 }
 
 if ($loggedIn && $_SERVER['REQUEST_METHOD'] === 'POST') {

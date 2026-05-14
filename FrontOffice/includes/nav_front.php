@@ -67,6 +67,17 @@ if ($nav_logged_in) {
             filter: brightness(1.05);
         }
 
+        .nav-profile-settings {
+            background-color: #ffffff !important;
+            color: #2C7E34 !important;
+            border: 2px solid #2C7E34 !important;
+        }
+
+        .nav-profile-settings:hover {
+            background-color: #ecfdf3 !important;
+            color: #1f5d28 !important;
+        }
+
         .nav-profile-userblock {
             padding: 4px 6px 10px;
             margin-bottom: 4px;
@@ -150,6 +161,7 @@ if ($nav_logged_in) {
                             <div class="nav-profile-email"><?php echo htmlspecialchars($nav_user_email, ENT_QUOTES, 'UTF-8'); ?></div>
                         <?php endif; ?>
                     </div>
+                    <a href="Profile_Utilisateur.php" class="nav-profile-btn nav-profile-settings">Paramètres</a>
                     <a href="../Controllers/AuthProcess.php?action=logout" class="nav-profile-btn nav-profile-logout">Se déconnecter</a>
                 <?php endif; ?>
             </div>

@@ -23,18 +23,27 @@ function hb_openai_api_key(): string
         return $t;
     };
 
-    $v = $trim(getenv('OPENAI_API_KEY') ?: '');
+    /** Clé parfois collée depuis un commentaire JS/TS (//sk-...). */
+    $stripCommentPrefix = static function (string $v): string {
+        if ($v !== '' && str_starts_with($v, '//')) {
+            return trim(substr($v, 2));
+        }
+
+        return $v;
+    };
+
+    $v = $stripCommentPrefix($trim(getenv('OPENAI_API_KEY') ?: ''));
     if ($v !== '') {
         return $v;
     }
     if (isset($_ENV['OPENAI_API_KEY'])) {
-        $v = $trim((string) $_ENV['OPENAI_API_KEY']);
+        $v = $stripCommentPrefix($trim((string) $_ENV['OPENAI_API_KEY']));
         if ($v !== '') {
             return $v;
         }
     }
     if (isset($_SERVER['OPENAI_API_KEY'])) {
-        $v = $trim((string) $_SERVER['OPENAI_API_KEY']);
+        $v = $stripCommentPrefix($trim((string) $_SERVER['OPENAI_API_KEY']));
         if ($v !== '') {
             return $v;
         }
@@ -46,7 +55,7 @@ function hb_openai_api_key(): string
         $raw = @file_get_contents($keyFile);
         if (is_string($raw) && $raw !== '') {
             foreach (preg_split('/\R/u', $raw) as $line) {
-                $line = $trim($line);
+                $line = $stripCommentPrefix($trim($line));
                 if ($line === '' || str_starts_with($line, '#')) {
                     continue;
                 }
@@ -56,7 +65,7 @@ function hb_openai_api_key(): string
     }
 
     if (defined('OPENAI_API_KEY')) {
-        $v = $trim((string) constant('OPENAI_API_KEY'));
+        $v = $stripCommentPrefix($trim((string) constant('OPENAI_API_KEY')));
         if ($v !== '') {
             return $v;
         }

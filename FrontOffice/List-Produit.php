@@ -34,12 +34,13 @@ if ($isFournisseur && $action === 'smart') {
 
 $resultatIA = null;
 
-$profilSante = false;
+$profilSante = null;
 if ($loggedIn && $idUtilisateur > 0) {
     $db = Config::getConnexion();
     $stmt = $db->prepare('SELECT * FROM profil_sante WHERE id_utilisateur = :id_utilisateur LIMIT 1');
     $stmt->execute(['id_utilisateur' => $idUtilisateur]);
-    $profilSante = $stmt->fetch(PDO::FETCH_ASSOC);
+    $rowProfil = $stmt->fetch(PDO::FETCH_ASSOC);
+    $profilSante = is_array($rowProfil) ? $rowProfil : null;
 }
 
 // IA BUDGET + SANTE
