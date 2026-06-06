@@ -54,6 +54,8 @@ $logoUrl = $baseUrl . '/images/logo.png';
 <html>
 <head>
 <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
 <style>
 table { border-collapse: collapse; width: 100%; font-family: "Poppins", sans-serif; font-size: 12px; font-weight: 400; }
 .brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
@@ -130,12 +132,20 @@ if (!empty($motCle)) {
 } else {
     $recettes = $recetteController->listRecettes();
 }
+
+require_once __DIR__ . '/includes/bo_inline_crud.php';
+$boPanelAction = isset($_GET['action']) ? (string) $_GET['action'] : '';
+$boPanelId = (int) ($_GET['id'] ?? 0);
+$boListUrl = bo_inline_crud_list_url('List-Recette.php');
+$boSaved = isset($_GET['saved']) && $_GET['saved'] === '1';
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <title>Liste des recettes</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -219,6 +229,7 @@ if (!empty($motCle)) {
                 font-size: 13px;
             }
         </style>
+        <?php bo_inline_crud_styles(); ?>
         <?php
         require_once __DIR__ . '/includes/bo_catalog_chrome.php';
         bo_catalog_chrome_topbar('recette');
@@ -229,8 +240,34 @@ if (!empty($motCle)) {
                 <h1 class="list-produit-title">Liste des recettes</h1>
                 <p class="list-produit-subtitle">Gérez les recettes du catalogue</p>
             </div>
-            <a href="Add-Recette.php" class="bo-btn-primary">Ajouter une recette</a>
+            <a href="<?php echo htmlspecialchars(bo_inline_crud_list_url('List-Recette.php', 'add'), ENT_QUOTES, 'UTF-8'); ?>" class="bo-btn-primary">Ajouter une recette</a>
         </div>
+
+        <?php if ($boSaved) { ?>
+            <div class="bo-flash-success" style="margin-bottom:16px;padding:12px 16px;border-radius:10px;background:#d1e7dd;color:#0f5132;">Enregistrement réussi.</div>
+        <?php } ?>
+
+        <?php if (in_array($boPanelAction, ['add', 'edit'], true)) {
+            $panelTitles = ['add' => 'Ajouter une recette', 'edit' => 'Modifier une recette'];
+            ?>
+        <section class="bo-inline-crud" id="bo-inline-crud">
+            <div class="bo-inline-crud__head">
+                <h2><?php echo htmlspecialchars($panelTitles[$boPanelAction], ENT_QUOTES, 'UTF-8'); ?></h2>
+                <a href="<?php echo htmlspecialchars($boListUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn-commande-outline">Fermer</a>
+            </div>
+            <div class="bo-inline-crud__body">
+                <?php
+                define('BO_CATALOG_INLINE', true);
+                if ($boPanelAction === 'add') {
+                    require __DIR__ . '/Add-Recette.php';
+                } elseif ($boPanelId > 0) {
+                    $_GET['id'] = (string) $boPanelId;
+                    require __DIR__ . '/Edit-Recette.php';
+                }
+                ?>
+            </div>
+        </section>
+        <?php } ?>
 
             <section class="bo-panel" aria-label="Recherche / filtres">
                 <form method="GET" action="">
@@ -314,7 +351,7 @@ if (!empty($motCle)) {
                                             <td class="bo-td-center">
                                                 <span class="bo-table-actions">
                                                     <a href="Detail-Recette.php?id=<?php echo $recette['id_recette']; ?>" class="bo-img-link" title="Voir le détail" aria-label="Voir le détail"><img src="images/details.png" width="22" height="22" alt=""></a>
-                                                    <a href="Edit-Recette.php?id=<?php echo $recette['id_recette']; ?>" class="bo-img-link" title="Modifier" aria-label="Modifier"><img src="images/modify.png" width="22" height="22" alt=""></a>
+                                                    <a href="<?php echo htmlspecialchars(bo_inline_crud_list_url('List-Recette.php', 'edit', (int) $recette['id_recette']), ENT_QUOTES, 'UTF-8'); ?>" class="bo-img-link" title="Modifier" aria-label="Modifier"><img src="images/modify.png" width="22" height="22" alt=""></a>
                                                     <a
                                                         href="List-Recette.php?delete=<?php echo $recette['id_recette']; ?>"
                                                         class="bo-img-link"

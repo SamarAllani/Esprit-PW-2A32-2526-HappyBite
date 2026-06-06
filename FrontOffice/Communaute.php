@@ -1,9 +1,11 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../config/Database.php';
 require_once __DIR__ . '/../Controllers/UtilisateurPhotoSql.php';
@@ -11,6 +13,12 @@ require_once __DIR__ . '/../Controllers/PostController.php';
 require_once __DIR__ . '/../Controllers/CommentaireController.php';
 require_once __DIR__ . '/../Controllers/StoryController.php';
 require_once __DIR__ . '/../Controllers/GeminiController.php';
+require_once __DIR__ . '/../Controllers/UploadStorage.php';
+
+function communaute_media_url(?string $stored): string
+{
+    return UploadStorage::publicUrl($stored, '../');
+}
 
 $postController = new PostController();
 $commentaireController = new CommentaireController();
@@ -35,22 +43,22 @@ function temps_ecoule_fr(?string $datetime): string
     }
     $diff = time() - $ts;
     if ($diff < 10) {
-        return "à l'instant";
+        return fo_t('community.time_now');
     }
     if ($diff < 60) {
-        return 'il y a quelques secondes';
+        return fo_t('community.time_seconds');
     }
     if ($diff < 3600) {
         $m = (int) floor($diff / 60);
-        return $m === 1 ? 'il y a 1 minute' : 'il y a ' . $m . ' minutes';
+        return $m === 1 ? fo_t('community.time_minute') : sprintf(fo_t('community.time_minutes'), $m);
     }
     if ($diff < 86400) {
         $h = (int) floor($diff / 3600);
-        return $h === 1 ? 'il y a 1 heure' : 'il y a ' . $h . ' heures';
+        return $h === 1 ? fo_t('community.time_hour') : sprintf(fo_t('community.time_hours'), $h);
     }
     if ($diff < 604800) {
         $d = (int) floor($diff / 86400);
-        return $d === 1 ? 'il y a 1 jour' : 'il y a ' . $d . ' jours';
+        return $d === 1 ? fo_t('community.time_day') : sprintf(fo_t('community.time_days'), $d);
     }
     return date('d/m/Y', $ts);
 }
@@ -166,6 +174,7 @@ $commLoggedIn = !empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === tru
 $commUserId = $commLoggedIn ? (int) ($_SESSION['user_id'] ?? 0) : 0;
 $commPrenom = $commLoggedIn ? (string) ($_SESSION['user_prenom'] ?? '') : '';
 $commNom = $commLoggedIn ? (string) ($_SESSION['user_nom'] ?? '') : '';
+$commRole = $commLoggedIn ? strtolower(trim((string) ($_SESSION['user_role'] ?? 'client'))) : '';
 $commPhotoRel = null;
 if ($commLoggedIn && $commUserId > 0) {
     try {
@@ -180,32 +189,33 @@ $commComposerDisplayName = communaute_display_nom_prenom($commNom, $commPrenom);
 $message = '';
 $messageType = '';
 
-if (isset($_GET['success'])) { $message = 'Post publié avec succès !'; $messageType = 'success'; }
-if (isset($_GET['updated'])) { $message = 'Post mis à jour avec succès !'; $messageType = 'success'; }
-if (isset($_GET['comment_success'])) { $message = 'Commentaire ajouté avec succès !'; $messageType = 'success'; }
-if (isset($_GET['comment_updated'])) { $message = 'Commentaire mis à jour avec succès !'; $messageType = 'success'; }
-if (isset($_GET['comment_deleted'])) { $message = 'Commentaire supprimé avec succès !'; $messageType = 'success'; }
-if (isset($_GET['story_success'])) { $message = 'Story ajoutée avec succès !'; $messageType = 'success'; }
+if (isset($_GET['success'])) { $message = fo_t('community.flash_post_published'); $messageType = 'success'; }
+if (isset($_GET['updated'])) { $message = fo_t('community.flash_post_updated'); $messageType = 'success'; }
+if (isset($_GET['comment_success'])) { $message = fo_t('community.flash_comment_added'); $messageType = 'success'; }
+if (isset($_GET['comment_updated'])) { $message = fo_t('community.flash_comment_updated'); $messageType = 'success'; }
+if (isset($_GET['comment_deleted'])) { $message = fo_t('community.flash_comment_deleted'); $messageType = 'success'; }
+if (isset($_GET['story_success'])) { $message = fo_t('community.flash_story_added'); $messageType = 'success'; }
+if (isset($_GET['story_deleted'])) { $message = fo_t('community.flash_story_deleted'); $messageType = 'success'; }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $isAjax = isset($_POST['ajax']) && $_POST['ajax'] === '1';
 
     if ($_POST['action'] === 'add_post') {
         if (!$commLoggedIn || $commUserId < 1) {
-            $message = 'Connectez-vous pour publier un post.';
+            $message = fo_t('community.login_publish_post');
             $messageType = 'warning';
         } else {
         $contenu = $_POST['contenu'] ?? '';
         if (!empty($contenu)) {
             $image = null;
             if (!empty($_POST['ai_image'])) {
-                $image = $_POST['ai_image']; // Use AI generated image
+                $image = trim((string) $_POST['ai_image']);
             }
             if (!empty($_FILES['image']['name'])) {
-                $uploadsDir = __DIR__ . '/../uploads/';
-                if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
-                $image = uniqid() . '-' . $_FILES['image']['name'];
-                move_uploaded_file($_FILES['image']['tmp_name'], $uploadsDir . $image);
+                $uploaded = UploadStorage::saveUploadedImage($_FILES['image'], 'posts');
+                if (!empty($uploaded['success']) && !empty($uploaded['path'])) {
+                    $image = (string) $uploaded['path'];
+                }
             }
             if ($postController->create($contenu, $image, $commUserId)) { header('Location: Communaute.php?success=1'); exit; }
             else { $message = 'Erreur lors de la publication du post.'; $messageType = 'danger'; }
@@ -223,11 +233,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $id = (int)$_POST['id'];
         if ($postController->delete($id)) {
             if ($isAjax) { echo json_encode(['success' => true, 'id' => $id]); exit; }
-            $message = 'Post supprimé avec succès !'; $messageType = 'success';
+            $message = fo_t('community.flash_post_deleted'); $messageType = 'success';
         } else { $message = 'Erreur lors de la suppression du post.'; $messageType = 'danger'; }
     } elseif ($_POST['action'] === 'like_post') {
         $id = (int)$_POST['id']; $liked = $_POST['liked'] === 'true';
-        if ($liked) $postController->removeLike($id); else $postController->addLike($id);
+        if ($liked) {
+            $postController->removeLike($id);
+        } else {
+            $postController->addLike($id);
+            if ($commLoggedIn && $commUserId > 0) {
+                require_once __DIR__ . '/../Controllers/UserNotificationService.php';
+                user_notification_post_liked(Database::getConnection(), $id, $commUserId);
+            }
+        }
         $post = $postController->getById($id);
         echo json_encode(['success' => true, 'likes' => $post['nombreLikes']]); exit;
     } elseif ($_POST['action'] === 'add_comment') {
@@ -246,11 +264,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     echo json_encode(['success' => false, 'error' => 'not_logged_in'], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
-                $message = 'Connectez-vous pour commenter.';
+                $message = fo_t('community.login_comment');
                 $messageType = 'warning';
             } else {
             $commentId = $commentaireController->create($contenu, $post_id, $commUserId);
             if ($commentId !== false) {
+                require_once __DIR__ . '/../Controllers/UserNotificationService.php';
+                user_notification_post_commented(Database::getConnection(), $post_id, $commUserId, (int) $commentId);
                 if ($isAjax) {
                     echo json_encode([
                         'success' => true,
@@ -326,23 +346,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $messageType = 'danger';
     } elseif ($_POST['action'] === 'add_story') {
         if (!$commLoggedIn || $commUserId < 1) {
-            $message = 'Connectez-vous pour ajouter une story.';
+            $message = fo_t('community.login_add_story');
             $messageType = 'warning';
         } else {
-        $uploadsDir = __DIR__ . '/../uploads/';
-        $storyOk = false;
         if (!empty($_FILES['image']['name']) && isset($_FILES['image']['error']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            if (!is_dir($uploadsDir)) {
-                mkdir($uploadsDir, 0755, true);
-            }
-            $image = uniqid() . '-story-' . basename((string) $_FILES['image']['name']);
-            $dest = $uploadsDir . $image;
-            if (is_uploaded_file($_FILES['image']['tmp_name']) && move_uploaded_file($_FILES['image']['tmp_name'], $dest)) {
-                if ($storyController->create($image, $commUserId)) {
+            $uploaded = UploadStorage::saveUploadedImage($_FILES['image'], 'stories');
+            if (!empty($uploaded['success']) && !empty($uploaded['path'])) {
+                $imagePath = (string) $uploaded['path'];
+                if ($storyController->create($imagePath, $commUserId)) {
                     header('Location: Communaute.php?story_success=1');
                     exit;
                 }
-                @unlink($dest);
+                $serverPath = UploadStorage::serverPath($imagePath);
+                if (is_file($serverPath)) {
+                    @unlink($serverPath);
+                }
             }
         }
         $message = 'Erreur lors de l\'ajout de la story.';
@@ -416,18 +434,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         echo json_encode(['success' => true, 'comments' => $out], JSON_UNESCAPED_UNICODE);
         exit;
     } elseif ($_POST['action'] === 'generate_image') {
-        $promptText = urlencode("delicious realistic food photography of " . ($_POST['prompt'] ?? 'food') . " highly detailed 4k");
-        $url = "https://image.pollinations.ai/prompt/" . $promptText . "?width=800&height=800&nologo=true";
-        $imageContent = @file_get_contents($url);
-        if ($imageContent) {
-            $uploadsDir = __DIR__ . '/../uploads/';
-            if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
-            $imageName = uniqid() . '-ai.jpg';
-            file_put_contents($uploadsDir . $imageName, $imageContent);
-            if ($isAjax) { echo json_encode(['success' => true, 'image' => $imageName]); exit; }
-        } else {
-            if ($isAjax) { echo json_encode(['success' => false, 'message' => 'Erreur de génération d\'image']); exit; }
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$commLoggedIn || $commUserId < 1) {
+            echo json_encode(['success' => false, 'message' => fo_t('community.login_generate_image')], JSON_UNESCAPED_UNICODE);
+            exit;
         }
+        require_once __DIR__ . '/../Controllers/CommunauteImageService.php';
+        $gen = communaute_generate_food_image((string) ($_POST['prompt'] ?? ''));
+        if (!empty($gen['ok'])) {
+            echo json_encode(['success' => true, 'image' => $gen['image']], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => $gen['message'] ?? fo_t('community.image_gen_error'),
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
     }
 }
 
@@ -436,10 +458,12 @@ $posts = $postController->getAll(3000, 0);
 $stories = $storyController->getActiveStories();
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Communaute - HappyBite</title>
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
+    <title><?php echo fo_e('community.title'); ?> - HappyBite</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -691,7 +715,36 @@ $stories = $storyController->getActiveStories();
             display: flex; justify-content: space-between; align-items: center;
         }
         .post-author-info { display: flex; align-items: center; gap: 12px; }
-        .post-author-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+        .post-author-name {
+            font-weight: 700; font-size: 0.95rem; color: var(--text);
+            display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+        }
+        .post-card.post-nutritionniste {
+            border: 2px solid #2ec4b6;
+            background: linear-gradient(to bottom right, #f0fdf4, #e0f7fa);
+            position: relative;
+        }
+        .post-card.post-nutritionniste::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #2C7E34, #2ec4b6);
+            border-radius: 1rem 1rem 0 0;
+        }
+        .badge-nutritionniste {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #2C7E34, #2ec4b6);
+            color: #fff;
+            border-radius: 999px;
+            padding: 3px 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-left: 2px;
+            vertical-align: middle;
+        }
         .post-date { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
         .menu-dots {
             background: none; border: none; width: 34px; height: 34px; border-radius: 8px;
@@ -1076,6 +1129,92 @@ $stories = $storyController->getActiveStories();
         .translate-menu button:hover { background: var(--green-light); color: var(--green); }
         .translate-menu button:last-child { border-top: 1px solid var(--border); margin-top: 4px; color: var(--text-muted); }
 
+        /* ── CHALLENGE FLOAT (fixed top-left) ── */
+        .community-challenge-float {
+            position: fixed;
+            top: 92px;
+            left: 16px;
+            z-index: 1100;
+            width: min(390px, calc(100vw - 32px));
+            aspect-ratio: 5 / 4;
+            height: auto;
+            border: none;
+            border-radius: 22px 18px 24px 16px;
+            overflow: hidden;
+            box-shadow: none;
+        }
+        .community-challenge-float__bg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: inherit;
+        }
+        .community-challenge-float__overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 14px;
+            padding: 20px 24px;
+            background: transparent;
+        }
+        .community-challenge-float__title {
+            margin: 0;
+            max-width: 54%;
+            font-size: 1.22rem;
+            font-weight: 700;
+            line-height: 1.3;
+            color: #FFD54F;
+            text-align: right;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 193, 7, 0.35);
+        }
+        .community-challenge-float__btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 26px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--green), var(--green-mid));
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease, filter 0.2s ease;
+            font-family: inherit;
+            box-shadow: none;
+        }
+        .community-challenge-float__btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.06);
+            color: #fff;
+        }
+        .community-challenge-float__btn:active {
+            transform: translateY(0);
+        }
+        @media (max-width: 640px) {
+            .community-challenge-float {
+                top: 88px;
+                left: 10px;
+                width: min(390px, calc(100vw - 20px));
+                border-radius: 18px 14px 20px 12px;
+            }
+            .community-challenge-float__overlay {
+                padding: 14px 16px;
+                gap: 10px;
+            }
+            .community-challenge-float__title {
+                max-width: 58%;
+                font-size: 1rem;
+            }
+        }
+
         :root {
     --hb-forest: #2C7E34;
     --hb-forest-mid: #256b2d;
@@ -1323,6 +1462,13 @@ $nav_active = 'communaute';
 require __DIR__ . '/includes/nav_front.php';
 ?>
 
+<aside class="community-challenge-float" aria-label="<?php echo fo_e('community.challenge_promo'); ?>">
+    <img class="community-challenge-float__bg" src="images/challenge.png" alt="<?php echo fo_e('community.challenge_image_alt'); ?>" width="390" height="312" loading="lazy">
+    <div class="community-challenge-float__overlay">
+        <p class="community-challenge-float__title"><?php echo fo_e('community.challenge_promo'); ?></p>
+        <a href="challenge_du_jour.php" class="community-challenge-float__btn"><?php echo fo_e('community.challenge_try'); ?></a>
+    </div>
+</aside>
 
 <!-- MAIN LAYOUT -->
 <div class="page-layout">
@@ -1331,7 +1477,7 @@ require __DIR__ . '/includes/nav_front.php';
         
         <!-- STORIES -->
         <div class="stories-wrapper">
-            <h6><i class="fas fa-circle-notch me-2"></i>Stories</h6>
+            <h6><i class="fas fa-circle-notch me-2"></i><?php echo fo_e('community.stories'); ?></h6>
             <div class="stories-container">
                 <!-- Add story -->
                 <div class="story-item" role="button" tabindex="0"
@@ -1341,7 +1487,7 @@ require __DIR__ . '/includes/nav_front.php';
                             <span class="add-icon"><i class="fas fa-plus"></i></span>
                         </div>
                     </div>
-                    <span class="story-label">Ajouter</span>
+                    <span class="story-label"><?php echo fo_e('community.add'); ?></span>
                 </div>
                 <?php if (!empty($stories)): foreach ($stories as $s):
                     $sid = (int) $s['id'];
@@ -1356,7 +1502,7 @@ require __DIR__ . '/includes/nav_front.php';
                 ?>
                 <div class="story-item" role="button" tabindex="0"
                      data-story-id="<?php echo $sid; ?>"
-                     data-story-image="<?php echo htmlspecialchars($s['image'], ENT_QUOTES, 'UTF-8'); ?>"
+                     data-story-image="<?php echo htmlspecialchars(communaute_media_url($s['image'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                      data-story-time="<?php echo htmlspecialchars(temps_ecoule_fr($s['dateCreation']), ENT_QUOTES, 'UTF-8'); ?>"
                      data-story-likes="<?php echo $sLikes; ?>"
                      data-story-comments="<?php echo $sComments; ?>"
@@ -1367,11 +1513,11 @@ require __DIR__ . '/includes/nav_front.php';
                      onclick="storyItemClick(this)">
                     <div class="story-ring">
                         <div class="story-ring-inner">
-                            <img src="../uploads/<?php echo htmlspecialchars($s['image']); ?>" alt="Story">
+                            <img src="<?php echo htmlspecialchars(communaute_media_url($s['image'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" alt="Story">
                         </div>
                     </div>
                     <span class="story-label"><?php echo htmlspecialchars($saLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="story-stats" title="J'aime et commentaires">
+                    <span class="story-stats" title="<?php echo fo_e('community.likes_comments'); ?>">
                         <span><i class="fas fa-heart" aria-hidden="true"></i> <?php echo $sLikes; ?></span>
                         <span><i class="fas fa-comment" aria-hidden="true"></i> <?php echo $sComments; ?></span>
                     </span>
@@ -1380,14 +1526,6 @@ require __DIR__ . '/includes/nav_front.php';
             </div>
         </div>
 
-        <?php if (!empty($message)): ?>
-        <div class="alert toast-alert alert-<?php echo htmlspecialchars($messageType); ?> alert-dismissible fade show" role="alert">
-            <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-circle'; ?> me-2"></i>
-            <?php echo htmlspecialchars($message); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        <?php endif; ?>
-
         <!-- CREATE POST -->
         <?php if ($commLoggedIn): ?>
         <div class="create-post-card">
@@ -1395,12 +1533,12 @@ require __DIR__ . '/includes/nav_front.php';
                 <?php echo communaute_avatar_html($commPhotoRel, $commPrenom, $commNom, ''); ?>
                 <div>
                     <div style="font-weight:600;color:var(--text);font-size:0.95rem;"><?php echo htmlspecialchars($commComposerDisplayName, ENT_QUOTES, 'UTF-8'); ?></div>
-                    <span>Quoi de neuf ? Partagez avec la communaute...</span>
+                    <span><?php echo fo_e('community.whats_new'); ?></span>
                 </div>
             </div>
             <form id="addPostForm" method="POST" enctype="multipart/form-data" onsubmit="return validateAddPost()">
                 <input type="hidden" name="action" value="add_post">
-                <textarea id="postContent" name="contenu" class="post-textarea" placeholder="Ecrivez quelque chose de savoureux..." rows="3"></textarea>
+                <textarea id="postContent" name="contenu" class="post-textarea" placeholder="<?php echo fo_e('community.post_placeholder'); ?>" rows="3"></textarea>
                 <div id="contentError" class="error-message"></div>
                 <div id="imagePreviewWrap" class="image-preview-wrap" style="display:none;">
                     <img id="imagePreview" src="" alt="preview">
@@ -1409,24 +1547,22 @@ require __DIR__ . '/includes/nav_front.php';
                 <div class="post-toolbar">
                     <div style="display:flex;gap:10px;align-items:center;">
                         <label for="postImage" class="file-label">
-                            <i class="fas fa-image"></i> Ajouter une photo
+                            <?php echo fo_e('community.add_photo'); ?>
                         </label>
                         <input type="file" id="postImage" name="image" accept="image/*" onchange="previewImage(this)">
                         <button type="button" class="ai-btn" onclick="generateWithAI(this)">
                             <img src="images/image.png" alt="" class="ai-btn-icon">
-                            <span class="ai-btn-label">Générer une image</span>
+                            <span class="ai-btn-label"><?php echo fo_e('community.generate_image'); ?></span>
                         </button>
                     </div>
-                    <button type="submit" class="btn-publish">
-                        <i class="fas fa-paper-plane"></i> Publier
-                    </button>
+                    <button type="submit" class="btn-publish"><?php echo fo_e('community.publish'); ?></button>
                 </div>
             </form>
         </div>
         <?php else: ?>
         <div class="create-post-card" style="text-align:center;padding:28px;">
-            <p style="color:var(--text-muted);margin-bottom:12px;">Connectez-vous pour publier, commenter ou ajouter une story.</p>
-            <a href="auth/login.php" class="btn-publish" style="display:inline-flex;text-decoration:none;">Se connecter</a>
+            <p style="color:var(--text-muted);margin-bottom:12px;"><?php echo fo_e('community.login_to_post'); ?></p>
+            <a href="auth/login.php" class="btn-publish" style="display:inline-flex;text-decoration:none;"><?php echo fo_e('nav.login'); ?></a>
         </div>
         <?php endif; ?>
 
@@ -1435,8 +1571,8 @@ require __DIR__ . '/includes/nav_front.php';
         <?php if (empty($posts)): ?>
         <div class="empty-state">
             <div class="empty-icon"><i class="fas fa-seedling"></i></div>
-            <h5>Aucun post pour le moment</h5>
-            <p>Soyez le premier a partager quelque chose avec la communaute !</p>
+            <h5><?php echo fo_e('community.empty_title'); ?></h5>
+            <p><?php echo fo_e('community.empty_desc'); ?></p>
         </div>
         <?php else: ?>
             <?php foreach ($posts as $post):
@@ -1445,13 +1581,36 @@ require __DIR__ . '/includes/nav_front.php';
                 $paPhoto = isset($post['auteur_photo']) ? (string) $post['auteur_photo'] : null;
                 $paName = communaute_display_nom_prenom($paNom, $paPrenom);
                 $isPostOwner = $commLoggedIn && $commUserId > 0 && (int) ($post['id_utilisateur'] ?? 0) === $commUserId;
+                $postUserRole = '';
+                if (!empty($post['id_utilisateur'])) {
+                    static $communauteRoleCache = [];
+                    $puid = (int) $post['id_utilisateur'];
+                    if (!isset($communauteRoleCache[$puid])) {
+                        try {
+                            $__pdo = Database::getConnection();
+                            $__pk = communaute_utilisateur_pk($__pdo);
+                            $__rs = $__pdo->prepare("SELECT role FROM utilisateur WHERE `{$__pk}` = :id LIMIT 1");
+                            $__rs->execute(['id' => $puid]);
+                            $communauteRoleCache[$puid] = (string) ($__rs->fetchColumn() ?: '');
+                        } catch (Throwable $e) {
+                            $communauteRoleCache[$puid] = '';
+                        }
+                    }
+                    $postUserRole = $communauteRoleCache[$puid];
+                }
+                $isNutriPost = ($postUserRole === 'nutritionniste');
             ?>
-            <div class="post-card" id="post-card-<?php echo $post['id']; ?>">
+            <div class="post-card<?php echo $isNutriPost ? ' post-nutritionniste' : ''; ?>" id="post-card-<?php echo $post['id']; ?>">
                 <div class="post-header">
                     <div class="post-author-info">
                         <?php echo communaute_avatar_html($paPhoto, $paPrenom, $paNom, ''); ?>
                         <div>
-                            <div class="post-author-name"><?php echo htmlspecialchars($paName, ENT_QUOTES, 'UTF-8'); ?></div>
+                            <div class="post-author-name">
+                                <?php echo htmlspecialchars($paName, ENT_QUOTES, 'UTF-8'); ?>
+                                <?php if ($isNutriPost) { ?>
+                                    <span class="badge-nutritionniste"><i class="fas fa-leaf" aria-hidden="true"></i> <?php echo fo_e('community.nutritionist_verified'); ?></span>
+                                <?php } ?>
+                            </div>
                             <div class="post-date"><i class="fas fa-clock me-1"></i><?php echo date('d M Y a H:i', strtotime($post['datePublication'])); ?></div>
                         </div>
                     </div>
@@ -1461,8 +1620,8 @@ require __DIR__ . '/includes/nav_front.php';
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenu<?php echo $post['id']; ?>">
-                            <li><button type="button" class="dropdown-item" onclick="openEditPostModal(<?php echo $post['id']; ?>)"><i class="fas fa-edit text-primary"></i> Modifier</button></li>
-                            <li><button type="button" class="dropdown-item text-danger" onclick="openDeleteConfirmation(<?php echo $post['id']; ?>)"><i class="fas fa-trash"></i> Supprimer</button></li>
+                            <li><button type="button" class="dropdown-item" onclick="openEditPostModal(<?php echo $post['id']; ?>)"><i class="fas fa-edit text-primary"></i> <?php echo fo_e('common.edit'); ?></button></li>
+                            <li><button type="button" class="dropdown-item text-danger" onclick="openDeleteConfirmation(<?php echo $post['id']; ?>)"><i class="fas fa-trash"></i> <?php echo fo_e('common.delete'); ?></button></li>
                         </ul>
                     </div>
                     <?php endif; ?>
@@ -1470,7 +1629,7 @@ require __DIR__ . '/includes/nav_front.php';
                 <div class="post-body">
                     <p id="post-text-<?php echo $post['id']; ?>"><?php echo nl2br(htmlspecialchars($post['contenu'])); ?></p>
                     <?php if (!empty($post['image'])): ?>
-                    <img src="../uploads/<?php echo htmlspecialchars($post['image']); ?>" alt="Post image" class="post-image">
+                    <img src="<?php echo htmlspecialchars(communaute_media_url($post['image'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" alt="Post image" class="post-image">
                     <?php endif; ?>
                 </div>
                 <div class="post-actions">
@@ -1488,7 +1647,7 @@ require __DIR__ . '/includes/nav_front.php';
                 <div id="comments-section-<?php echo $post['id']; ?>" class="comments-section hidden">
                     <?php $comments = $commentaireController->getByPostId($post['id']); ?>
                     <?php if (empty($comments)): ?>
-                        <p style="text-align:center;color:var(--text-muted);font-size:0.85rem;padding:10px 0;">Aucun commentaire. Soyez le premier !</p>
+                        <p style="text-align:center;color:var(--text-muted);font-size:0.85rem;padding:10px 0;"><?php echo fo_e('community.no_comments'); ?></p>
                     <?php else: ?>
                         <?php foreach ($comments as $comment):
                             $caPrenom = (string) ($comment['auteur_prenom'] ?? '');
@@ -1508,10 +1667,10 @@ require __DIR__ . '/includes/nav_front.php';
                                 <div class="comment-actions-row" style="align-items:center; flex-wrap:wrap; position:relative;">
                                     <?php if ($isCommentOwner): ?>
                                     <button class="comment-action-link" onclick='openEditCommentModal(<?php echo $comment['id']; ?>, "<?php echo addslashes($comment['contenu']); ?>")'>
-                                        <i class="fas fa-edit"></i> Modifier
+                                        <i class="fas fa-edit"></i> <?php echo fo_e('common.edit'); ?>
                                     </button>
                                     <button class="comment-action-link danger" onclick="openDeleteCommentConfirmation(<?php echo $comment['id']; ?>)">
-                                        <i class="fas fa-trash"></i> Supprimer
+                                        <i class="fas fa-trash"></i> <?php echo fo_e('common.delete'); ?>
                                     </button>
                                     <?php endif; ?>
                                     <!-- Translate button with dropdown -->
@@ -1527,12 +1686,6 @@ require __DIR__ . '/includes/nav_front.php';
                                             </button>
                                             <button type="button" onclick="translateComment(<?php echo $comment['id']; ?>, 'en', this)" data-original="<?php echo htmlspecialchars(addslashes($comment['contenu'])); ?>">
                                                 🇬🇧 English
-                                            </button>
-                                            <button type="button" onclick="translateComment(<?php echo $comment['id']; ?>, 'de', this)" data-original="<?php echo htmlspecialchars(addslashes($comment['contenu'])); ?>">
-                                                🇩🇪 Deutsch
-                                            </button>
-                                            <button type="button" onclick="translateComment(<?php echo $comment['id']; ?>, 'ar', this)" data-original="<?php echo htmlspecialchars(addslashes($comment['contenu'])); ?>">
-                                                🇸🇦 العربية
                                             </button>
                                             <button type="button" onclick="restoreOriginalComment(<?php echo $comment['id']; ?>, this)" data-original="<?php echo htmlspecialchars(addslashes($comment['contenu'])); ?>">
                                                 🔄 Original (texte enregistré)
@@ -1551,7 +1704,7 @@ require __DIR__ . '/includes/nav_front.php';
                             <input type="hidden" name="action" value="add_comment">
                             <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
                             <div style="display:flex;gap:8px;align-items:flex-end;">
-                                <textarea class="comment-textarea" name="contenu" id="commentContent-<?php echo $post['id']; ?>" placeholder="Ajouter un commentaire..." rows="1"></textarea>
+                                <textarea class="comment-textarea" name="contenu" id="commentContent-<?php echo $post['id']; ?>" placeholder="<?php echo fo_e('community.add_comment'); ?>" rows="1"></textarea>
                                 <button type="submit" class="btn-comment"><i class="fas fa-paper-plane"></i></button>
                             </div>
                             <div id="commentError-<?php echo $post['id']; ?>" class="error-message"></div>
@@ -1559,7 +1712,7 @@ require __DIR__ . '/includes/nav_front.php';
                     </div>
                     <?php else: ?>
                     <p style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin-top:10px;">
-                        <a href="auth/login.php">Connectez-vous</a> pour commenter.
+                        <a href="auth/login.php"><?php echo fo_e('nav.login'); ?></a> — <?php echo fo_e('community.login_to_comment'); ?>
                     </p>
                     <?php endif; ?>
                 </div>
@@ -1606,7 +1759,7 @@ require __DIR__ . '/includes/nav_front.php';
 <div id="editPostModal" class="modal-custom">
     <div class="modal-custom-content">
         <div class="modal-icon">&#9998;</div>
-        <h4>Modifier le post</h4>
+        <h4><?php echo fo_e('community.edit_post'); ?></h4>
         <form id="editPostForm" method="POST" onsubmit="return validateEditPost()">
             <input type="hidden" name="action" value="update_post">
             <input type="hidden" id="postId" name="id" value="">
@@ -1623,10 +1776,10 @@ require __DIR__ . '/includes/nav_front.php';
 <div id="deleteConfirmationModal" class="modal-custom">
     <div class="modal-custom-content">
         <div class="modal-icon">&#128465;</div>
-        <h4>Supprimer ce post ?</h4>
+        <h4><?php echo fo_e('community.delete_post'); ?></h4>
         <p>Cette action est irreversible. Le post sera definitivement supprime.</p>
         <div class="modal-footer-btns">
-            <button type="button" class="btn btn-danger" onclick="confirmDelete()">Supprimer</button>
+            <button type="button" class="btn btn-danger" onclick="confirmDelete()"><?php echo fo_e('common.delete'); ?></button>
             <button type="button" class="btn btn-secondary" onclick="closeDeleteConfirmation()">Annuler</button>
         </div>
     </div>
@@ -1635,7 +1788,7 @@ require __DIR__ . '/includes/nav_front.php';
 <div id="editCommentModal" class="modal-custom">
     <div class="modal-custom-content">
         <div class="modal-icon">&#128172;</div>
-        <h4>Modifier le commentaire</h4>
+        <h4><?php echo fo_e('community.edit_comment'); ?></h4>
         <form id="editCommentForm" method="POST" onsubmit="return validateEditComment()">
             <input type="hidden" name="action" value="update_comment">
             <input type="hidden" id="commentId" name="id" value="">
@@ -1652,10 +1805,10 @@ require __DIR__ . '/includes/nav_front.php';
 <div id="deleteCommentConfirmationModal" class="modal-custom">
     <div class="modal-custom-content">
         <div class="modal-icon">&#128465;</div>
-        <h4>Supprimer ce commentaire ?</h4>
+        <h4><?php echo fo_e('community.delete_comment'); ?></h4>
         <p>Cette action est irreversible.</p>
         <div class="modal-footer-btns">
-            <button type="button" class="btn btn-danger" onclick="confirmDeleteComment()">Supprimer</button>
+            <button type="button" class="btn btn-danger" onclick="confirmDeleteComment()"><?php echo fo_e('common.delete'); ?></button>
             <button type="button" class="btn btn-secondary" onclick="closeDeleteCommentConfirmation()">Annuler</button>
         </div>
     </div>
@@ -1664,7 +1817,7 @@ require __DIR__ . '/includes/nav_front.php';
 <div id="uploadStoryModal" class="modal-custom">
     <div class="modal-custom-content">
         <div class="modal-icon" style="color:var(--green);">&#43;</div>
-        <h4>Ajouter une Story</h4>
+        <h4><?php echo fo_e('community.add_story'); ?></h4>
         <?php
         // PHP server-side story validation errors
         $storyError = '';
@@ -1684,11 +1837,6 @@ require __DIR__ . '/includes/nav_front.php';
             }
         }
         ?>
-        <?php if (!empty($storyError)): ?>
-            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:0.85rem;border-radius:8px;">
-                <i class="fas fa-exclamation-circle me-1"></i><?php echo htmlspecialchars($storyError); ?>
-            </div>
-        <?php endif; ?>
         <form id="addStoryForm" method="POST" enctype="multipart/form-data" onsubmit="return validateStoryPHP(this)">
             <input type="hidden" name="action" value="add_story">
             <div style="margin-bottom:15px;">
@@ -1704,8 +1852,8 @@ require __DIR__ . '/includes/nav_front.php';
             </div>
             <div id="storyFormError" class="error-message mb-2"></div>
             <div class="modal-footer-btns">
-                <button type="submit" class="btn btn-green">Publier la story</button>
-                <button type="button" class="btn btn-secondary" onclick="closeStoryUploadModal()">Annuler</button>
+                <button type="submit" class="btn btn-green"><?php echo fo_e('community.publish_story'); ?></button>
+                <button type="button" class="btn btn-secondary" onclick="closeStoryUploadModal()"><?php echo fo_e('common.cancel'); ?></button>
             </div>
         </form>
     </div>
@@ -1738,7 +1886,7 @@ require __DIR__ . '/includes/nav_front.php';
             <div id="storyCommentsList" class="story-comments-scroll" style="display:none;"></div>
             <div class="story-footer-row">
                 <div class="story-engage-btns">
-                    <button type="button" class="story-engage-btn" id="storyLikeBtn" onclick="toggleStoryLike(event)" title="J'aime">
+                    <button type="button" class="story-engage-btn" id="storyLikeBtn" onclick="toggleStoryLike(event)" title="<?php echo fo_e('community.like'); ?>">
                         <i class="fas fa-heart"></i> <span id="storyLikeCount">0</span> <span style="font-weight:500;opacity:0.9">J'aime</span>
                     </button>
                     <div class="story-engage-btn" style="cursor:default;pointer-events:none;opacity:0.95;" title="Commentaires">
@@ -1751,12 +1899,12 @@ require __DIR__ . '/includes/nav_front.php';
             </div>
             <?php if ($commLoggedIn): ?>
             <form class="story-comment-form" id="storyCommentForm" onsubmit="return submitStoryComment(event)">
-                <input type="text" name="story_comment" id="storyCommentInput" placeholder="Ajouter un commentaire..." maxlength="2000" autocomplete="off">
+                <input type="text" name="story_comment" id="storyCommentInput" placeholder="<?php echo fo_e('community.add_comment'); ?>" maxlength="2000" autocomplete="off">
                 <button type="submit" aria-label="Envoyer"><i class="fas fa-paper-plane"></i></button>
             </form>
             <?php else: ?>
             <p style="text-align:center;color:rgba(255,255,255,0.75);font-size:0.8rem;padding:8px 0 0;">
-                <a href="auth/login.php" style="color:#fff;font-weight:600;">Connectez-vous</a> pour commenter les stories.
+                <a href="auth/login.php" style="color:#fff;font-weight:600;"><?php echo fo_e('nav.login'); ?></a> — <?php echo fo_e('community.login_comment_stories'); ?>
             </p>
             <?php endif; ?>
         </div>
@@ -1776,6 +1924,21 @@ const COMMUNITY_ME = <?php echo json_encode([
     'photoUrl' => $commPhotoUrl,
     'displayName' => $commComposerDisplayName,
 ], JSON_UNESCAPED_UNICODE); ?>;
+const COMMUNITY_TOAST = <?php echo json_encode([
+    'postUpdated' => fo_t('community.flash_post_updated'),
+    'postDeleted' => fo_t('community.flash_post_deleted'),
+    'commentAdded' => fo_t('community.flash_comment_added'),
+    'commentUpdated' => fo_t('community.flash_comment_updated'),
+    'commentDeleted' => fo_t('community.flash_comment_deleted'),
+    'storyDeleted' => fo_t('community.flash_story_deleted'),
+    'error' => fo_t('toast.network_error'),
+], JSON_UNESCAPED_UNICODE); ?>;
+
+function commActionToast(text) {
+    if (typeof window.hbShowActionToast === 'function' && text) {
+        window.hbShowActionToast(text, 3500);
+    }
+}
 
 function communityInitials(prenom, nom) {
     const p = (prenom || '').trim();
@@ -1830,7 +1993,7 @@ function validateAddPost() {
     const err = document.getElementById('contentError');
     err.textContent = '';
     if (!COMMUNITY_LOGGED_IN) {
-        err.textContent = 'Connectez-vous pour publier.';
+        err.textContent = <?php echo json_encode(fo_t('community.login_publish_js'), JSON_UNESCAPED_UNICODE); ?>;
         return false;
     }
     const content = document.getElementById('postContent').value.trim();
@@ -1851,6 +2014,7 @@ function validateEditPost() {
             const el = document.getElementById('post-text-' + data.id);
             if (el) el.innerHTML = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
             closeEditPostModal();
+            commActionToast(COMMUNITY_TOAST.postUpdated);
         } else err.textContent = 'Erreur lors de la mise a jour.';
     }).catch(() => err.textContent = 'Erreur lors de la mise a jour.');
     return false;
@@ -1876,6 +2040,7 @@ function confirmDelete() {
                 const card = document.getElementById('post-card-' + data.id);
                 if (card) { card.style.animation = 'fadeOut 0.3s ease forwards'; setTimeout(() => card.remove(), 300); }
                 closeDeleteConfirmation();
+                commActionToast(COMMUNITY_TOAST.postDeleted);
             }
         }).catch(() => closeDeleteConfirmation());
     }
@@ -1905,7 +2070,7 @@ function validateComment(postId) {
     const err = document.getElementById('commentError-' + postId);
     err.textContent = '';
     if (!COMMUNITY_LOGGED_IN) {
-        err.textContent = 'Connectez-vous pour commenter.';
+        err.textContent = <?php echo json_encode(fo_t('community.login_comment_js'), JSON_UNESCAPED_UNICODE); ?>;
         return false;
     }
     const el = document.getElementById('commentContent-' + postId);
@@ -1931,12 +2096,13 @@ function validateComment(postId) {
             const avHtml = communityCommentAvatarFromUser(data.photoUrl || '', data.prenom, data.nom);
             const div = document.createElement('div');
             div.className = 'comment-item'; div.id = 'comment-item-' + data.id;
-            div.innerHTML = avHtml + '<div class="comment-bubble"><div class="comment-meta"><span class="comment-author">' + authorName + '</span><span class="comment-date">' + escapeHtml(data.dateCommentaire) + '</span></div><p class="comment-text" id="comment-content-' + data.id + '">' + escapeHtml(data.contenu) + '</p><div class="comment-actions-row" style="align-items:center;flex-wrap:wrap;position:relative;"><button class="comment-action-link" onclick="openEditCommentModal(' + data.id + ', \'' + escapeJsString(data.contenu) + '\')"><i class="fas fa-edit"></i> Modifier</button><button class="comment-action-link danger" onclick="openDeleteCommentConfirmation(' + data.id + ')"><i class="fas fa-trash"></i> Supprimer</button><div class="translate-btn-wrap" id="translate-wrap-' + data.id + '"><button type="button" class="comment-action-link translate-toggle" onclick="toggleTranslateMenu(' + data.id + ', event)"><i class="fas fa-language"></i> Traduire <i class="fas fa-chevron-down" style="font-size:0.6rem;margin-left:2px;"></i></button><div class="translate-menu" id="translate-menu-' + data.id + '" style="display:none;"><button type="button" onclick="translateComment(' + data.id + ', \'fr\', this)" data-original="' + escapeAttr(data.contenu) + '">🇫🇷 Français</button><button type="button" onclick="translateComment(' + data.id + ', \'en\', this)" data-original="' + escapeAttr(data.contenu) + '">🇬🇧 English</button><button type="button" onclick="translateComment(' + data.id + ', \'de\', this)" data-original="' + escapeAttr(data.contenu) + '">🇩🇪 Deutsch</button><button type="button" onclick="translateComment(' + data.id + ', \'ar\', this)" data-original="' + escapeAttr(data.contenu) + '">🇸🇦 العربية</button><button type="button" onclick="restoreOriginalComment(' + data.id + ', this)" data-original="' + escapeAttr(data.contenu) + '">🔄 Original (texte enregistré)</button></div></div></div></div>';
+            div.innerHTML = avHtml + '<div class="comment-bubble"><div class="comment-meta"><span class="comment-author">' + authorName + '</span><span class="comment-date">' + escapeHtml(data.dateCommentaire) + '</span></div><p class="comment-text" id="comment-content-' + data.id + '">' + escapeHtml(data.contenu) + '</p><div class="comment-actions-row" style="align-items:center;flex-wrap:wrap;position:relative;"><button class="comment-action-link" onclick="openEditCommentModal(' + data.id + ', \'' + escapeJsString(data.contenu) + '\')"><i class="fas fa-edit"></i> Modifier</button><button class="comment-action-link danger" onclick="openDeleteCommentConfirmation(' + data.id + ')"><i class="fas fa-trash"></i> Supprimer</button><div class="translate-btn-wrap" id="translate-wrap-' + data.id + '"><button type="button" class="comment-action-link translate-toggle" onclick="toggleTranslateMenu(' + data.id + ', event)"><i class="fas fa-language"></i> Traduire <i class="fas fa-chevron-down" style="font-size:0.6rem;margin-left:2px;"></i></button><div class="translate-menu" id="translate-menu-' + data.id + '" style="display:none;"><button type="button" onclick="translateComment(' + data.id + ', \'fr\', this)" data-original="' + escapeAttr(data.contenu) + '">🇫🇷 Français</button><button type="button" onclick="translateComment(' + data.id + ', \'en\', this)" data-original="' + escapeAttr(data.contenu) + '">🇬🇧 English</button><button type="button" onclick="restoreOriginalComment(' + data.id + ', this)" data-original="' + escapeAttr(data.contenu) + '">🔄 Original (texte enregistré)</button></div></div></div></div>';
             section.insertBefore(div, section.querySelector('.comment-form-row'));
             el.value = '';
+            commActionToast(COMMUNITY_TOAST.commentAdded);
         } else {
             if (data.error === 'not_logged_in') {
-                err.textContent = 'Connectez-vous pour commenter.';
+                err.textContent = <?php echo json_encode(fo_t('community.login_comment_js'), JSON_UNESCAPED_UNICODE); ?>;
             } else {
                 err.textContent = data.error === 'db' ? "Impossible d'enregistrer en base de données." : "Erreur lors de l'ajout.";
             }
@@ -1967,8 +2133,6 @@ function storyCommentRowHtml(c) {
         '<div class="translate-menu" id="story-translate-menu-' + id + '" style="display:none;">' +
         '<button type="button" onclick="translateStoryComment(' + id + ', \'fr\', this)" data-original="' + orig + '">🇫🇷 Français</button>' +
         '<button type="button" onclick="translateStoryComment(' + id + ', \'en\', this)" data-original="' + orig + '">🇬🇧 English</button>' +
-        '<button type="button" onclick="translateStoryComment(' + id + ', \'de\', this)" data-original="' + orig + '">🇩🇪 Deutsch</button>' +
-        '<button type="button" onclick="translateStoryComment(' + id + ', \'ar\', this)" data-original="' + orig + '">🇸🇦 العربية</button>' +
         '<button type="button" onclick="restoreStoryOriginalComment(' + id + ', this)" data-original="' + orig + '">🔄 Original</button>' +
         '</div></div></div>';
 }
@@ -1993,6 +2157,7 @@ function validateEditComment() {
             const el = document.getElementById('comment-content-' + data.id);
             if (el) el.textContent = content;
             closeEditCommentModal();
+            commActionToast(COMMUNITY_TOAST.commentUpdated);
         } else err.textContent = 'Erreur lors de la mise a jour.';
     }).catch(() => err.textContent = 'Erreur lors de la mise a jour.');
     return false;
@@ -2010,6 +2175,7 @@ function confirmDeleteComment() {
                 const el = document.getElementById('comment-item-' + data.id);
                 if (el) el.remove();
                 closeDeleteCommentConfirmation();
+                commActionToast(COMMUNITY_TOAST.commentDeleted);
             }
         }).catch(() => closeDeleteCommentConfirmation());
     }
@@ -2166,9 +2332,16 @@ function submitStoryComment(ev) {
     return false;
 }
 
+function communityMediaUrl(stored) {
+    if (!stored) return '';
+    if (/^https?:\/\//i.test(stored) || stored.indexOf('../') === 0) return stored;
+    if (stored.indexOf('/') !== -1) return '../' + stored;
+    return '../uploads/' + stored;
+}
+
 function viewStory(id, image, time, likes, comments, liked, authorName, authorPhotoUrl, authorInitials) {
     currentStoryId = id;
-    document.getElementById('storyViewerImg').src = '../uploads/' + image;
+    document.getElementById('storyViewerImg').src = communityMediaUrl(image);
     document.getElementById('storyTime').textContent = time || '';
     document.getElementById('storyViewerUserName').textContent = authorName || 'Membre';
     const avSlot = document.getElementById('storyViewerAvatarSlot');
@@ -2196,46 +2369,69 @@ function closeViewStoryModal() {
 }
 
 function deleteStory(id) {
-    if(confirm("Supprimer cette story ?")) {
+    (window.hbConfirm || function (m) { return Promise.resolve(window.confirm(m)); })(<?php echo json_encode(fo_t('community.delete_story_confirm'), JSON_UNESCAPED_UNICODE); ?>).then(function (ok) {
+        if (!ok) {
+            return;
+        }
         fetch(COMMUNITY_PAGE, { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=delete_story&ajax=1&id=' + id
         }).then(r => r.json()).then(data => {
-            if(data.success) { location.reload(); }
-            else alert('Erreur lors de la suppression.');
-        }).catch(err => alert('Erreur'));
-    }
+            if (data.success) {
+                window.location.href = COMMUNITY_PAGE + '?story_deleted=1';
+            } else {
+                commActionToast(COMMUNITY_TOAST.error);
+            }
+        }).catch(function () {
+            (window.hbAlert || alert)('Erreur');
+        });
+    });
 }
 
 function generateWithAI(btn) {
-    const promptText = prompt("Quel plat souhaitez-vous générer en image (ex: Pizza margherita, Burger gastronomique) ?");
-    if (!promptText) return;
-    
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
-    btn.disabled = true;
-    
-    fetch(COMMUNITY_PAGE, {
-        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=generate_image&ajax=1&prompt=' + encodeURIComponent(promptText)
-    }).then(r => r.json()).then(data => {
-        if(data.success) {
-            document.getElementById('imagePreview').src = '../uploads/' + data.image;
-            document.getElementById('imagePreviewWrap').style.display = 'inline-block';
-            let aiInput = document.getElementById('aiGeneratedImage');
-            if(!aiInput) {
-                aiInput = document.createElement('input');
-                aiInput.type = 'hidden';
-                aiInput.name = 'ai_image';
-                aiInput.id = 'aiGeneratedImage';
-                document.getElementById('addPostForm').appendChild(aiInput);
-            }
-            aiInput.value = data.image;
-        } else {
-            alert('Erreur: ' + data.message);
+    (window.hbPrompt || function (m) { return Promise.resolve(window.prompt(m)); })(
+        'Quel plat souhaitez-vous générer en image (ex: Pizza margherita, Burger gastronomique) ?',
+        { title: 'Génération d\'image', placeholder: 'Ex: Pizza margherita' }
+    ).then(function (promptText) {
+        if (!promptText) {
+            return;
         }
-    }).catch(err => alert('Erreur de génération d\'image')).finally(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        var originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+        btn.disabled = true;
+        fetch(COMMUNITY_PAGE, {
+            method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=generate_image&ajax=1&prompt=' + encodeURIComponent(promptText)
+        }).then(function (r) {
+            return r.text().then(function (text) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('generate_image non-JSON:', text.slice(0, 300));
+                    throw e;
+                }
+            });
+        }).then(function (data) {
+            if (data && data.success) {
+                document.getElementById('imagePreview').src = communityMediaUrl(data.image);
+                document.getElementById('imagePreviewWrap').style.display = 'inline-block';
+                var aiInput = document.getElementById('aiGeneratedImage');
+                if (!aiInput) {
+                    aiInput = document.createElement('input');
+                    aiInput.type = 'hidden';
+                    aiInput.name = 'ai_image';
+                    aiInput.id = 'aiGeneratedImage';
+                    document.getElementById('addPostForm').appendChild(aiInput);
+                }
+                aiInput.value = data.image;
+            } else {
+                (window.hbAlert || alert)('Erreur: ' + (data && data.message ? data.message : 'Génération impossible'));
+            }
+        }).catch(function () {
+            (window.hbAlert || alert)('Erreur de génération d\'image (réponse serveur invalide)');
+        }).finally(function () {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
     });
 }
 
@@ -2265,7 +2461,7 @@ function translateComment(commentId, targetLang, btn) {
             const badge = document.createElement('span');
             badge.id = 'badge-trans-' + commentId;
             badge.style.cssText = 'font-size:0.72rem;color:var(--green);font-style:italic;margin-left:6px;';
-            const langNames = {en:'EN', de:'DE', ar:'AR', fr:'FR'};
+            const langNames = {en:'EN', fr:'FR'};
             badge.textContent = '(' + (langNames[targetLang] || targetLang) + ')';
             contentEl.appendChild(badge);
         } else {
@@ -2312,7 +2508,7 @@ function translateStoryComment(commentId, targetLang, btn) {
             const badge = document.createElement('span');
             badge.id = 'story-badge-trans-' + commentId;
             badge.style.cssText = 'font-size:0.68rem;color:rgba(255,255,255,0.75);font-style:italic;margin-left:6px;';
-            const langNames = {fr: 'FR', en: 'EN', de: 'DE', ar: 'AR'};
+            const langNames = {fr: 'FR', en: 'EN'};
             badge.textContent = '(' + (langNames[targetLang] || targetLang) + ')';
             contentEl.appendChild(badge);
         } else {
@@ -2405,6 +2601,21 @@ function exportToPDF() {
 <footer class="site-copyright">© 2026 HappyBite</footer>
 
 <?php
+require_once __DIR__ . '/includes/hb_action_toast.php';
+$commFlashKeys = ['success', 'updated', 'comment_success', 'comment_updated', 'comment_deleted', 'story_success', 'story_deleted'];
+$commStripFlash = false;
+foreach ($commFlashKeys as $commFlashKey) {
+    if (isset($_GET[$commFlashKey])) {
+        $commStripFlash = true;
+        break;
+    }
+}
+if ($message !== '') {
+    hb_action_toast_script($message, 4000, $commStripFlash, $commFlashKeys);
+}
+if (!empty($storyError)) {
+    hb_action_toast_script((string) $storyError, 5000);
+}
 if (empty($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     require __DIR__ . '/includes/guest_login_gate.php';
 }

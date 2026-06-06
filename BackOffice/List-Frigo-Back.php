@@ -40,6 +40,8 @@ $logoUrl = $baseUrl . '/images/logo.png';
 <html>
 <head>
 <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
 <style>
 table { border-collapse: collapse; width: 100%; font-family: "Poppins", sans-serif; font-size: 12px; font-weight: 400; }
 .brand { background-color: #ffffff; border-bottom: 3px solid #2e7d32; height: 80px; }
@@ -101,6 +103,8 @@ $frigos = $frigoController->getResumeFrigos($motCle, $idUtilisateur);
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <title>Liste des frigos</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 

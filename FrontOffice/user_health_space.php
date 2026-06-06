@@ -1,9 +1,41 @@
-<?php
-
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
+
+function hb_sport_label(string $sportType): string
+{
+    $map = [
+        'aucune' => fo_t('health.sport_type_none'),
+        'marche' => fo_t('health.sport_type_walk'),
+        'course' => fo_t('health.sport_type_run'),
+        'natation' => fo_t('health.sport_type_swim'),
+        'danse' => fo_t('health.sport_type_dance'),
+        'escalade' => fo_t('health.sport_type_climb'),
+        'velo' => fo_t('health.sport_type_bike'),
+        'cardio' => fo_t('health.sport_type_cardio'),
+        'musculation' => fo_t('health.sport_type_gym'),
+        'yoga' => fo_t('health.sport_type_yoga'),
+        'autre' => fo_t('health.sport_type_other'),
+    ];
+
+    return $map[$sportType] ?? ucfirst($sportType);
+}
+
+function hb_intensite_label(string $intensite): string
+{
+    $map = [
+        'aucune' => fo_t('health.intensity_none'),
+        'faible' => fo_t('health.intensity_low'),
+        'moyenne' => fo_t('health.intensity_medium'),
+        'elevee' => fo_t('health.intensity_high'),
+    ];
+
+    return $map[$intensite] ?? strtolower($intensite);
 }
 
 $loggedIn = !empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
@@ -11,6 +43,9 @@ $sessionUid = $loggedIn ? (int) ($_SESSION['user_id'] ?? 0) : 0;
 $guestHealthSpace = !$loggedIn || $sessionUid < 1;
 
 $healthNotice = isset($_GET['notice']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['notice']) : '';
+
+require_once __DIR__ . '/includes/fo_sante_inline.php';
+$foSantePreserve = fo_sante_preserve_query();
 
 if ($guestHealthSpace) {
     $user = null;
@@ -158,11 +193,13 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
 
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HappyBite — Mon espace santé</title>
+    <title>HappyBite — <?php echo fo_e('health.user_space_title'); ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet">
@@ -176,7 +213,7 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
             margin: 0 auto;
             padding: 2rem clamp(1rem, 3vw, 2rem) 3.75rem;
             box-sizing: border-box;
-            background: linear-gradient(180deg, #eef8f1 0%, #f4fbf7 35%, #f7fcf9 100%);
+            background: var(--hb-health-bg, #0C1014);
             border-radius: 0;
             min-height: calc(100vh - 120px);
         }
@@ -371,9 +408,10 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
             text-align: center;
         }
         .health-flash--ok {
-            background: #ecfdf3;
-            color: #166534;
-            border: 1px solid #bbf7d0;
+            background: linear-gradient(135deg, #fb8c00 0%, #e65100 100%);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 16px 40px rgba(230, 81, 0, 0.35);
         }
         .health-flash--err {
             background: #fef2f2;
@@ -535,19 +573,24 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
             border-radius: 20px;
             border: 1px solid #ddd;
             border-top: 8px solid var(--hb-forest, #2C7E34);
-            padding: 26px 28px 28px;
-            max-width: min(480px, 100%);
+            padding: 28px 32px 30px;
+            max-width: min(760px, calc(100vw - 2rem));
             width: 100%;
+            max-height: min(85vh, 900px);
+            overflow-y: auto;
             box-shadow: 0 12px 40px rgba(19, 42, 28, 0.14);
             box-sizing: border-box;
         }
         .popup-box h3 {
             margin: 0 0 20px;
             font-weight: 700;
-            color: var(--hb-forest, #2C7E34);
             text-align: center;
             font-size: 1.35rem;
             letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #e53935 0%, #fb8c00 52%, #43a047 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
         #popupContent {
             margin: 0;
@@ -555,9 +598,42 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
         .conseil-box {
             color: #333;
             text-align: left;
-            font-size: 0.95rem;
-            font-weight: 400;
-            line-height: 1.65;
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.7;
+        }
+        .conseil-box strong,
+        .conseil-box b {
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        .conseil-date {
+            text-align: center;
+            color: #2C7E34;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .conseil-badge {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-align: center;
+        }
+        .conseil-badge--good {
+            background: #ecfdf3;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .conseil-badge--warn {
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
+        }
+        .conseil-badge--neutral {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #e5e7eb;
         }
         .conseil-box br {
             display: block;
@@ -588,6 +664,45 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
         }
         .health-muted { color: #5c6b62; font-size: 0.92rem; margin: 0 0 12px; line-height: 1.5; }
         .health-empty { text-align: center; color: #b45309; font-weight: 500; padding: 12px; grid-column: 1 / -1; }
+        .suivi-row--sport {
+            align-items: flex-start;
+        }
+        .suivi-row--sport .suivi-row-left {
+            padding-top: 2px;
+        }
+        .sport-summary {
+            text-align: right;
+            max-width: 175px;
+            line-height: 1.35;
+        }
+        .sport-main {
+            display: block;
+            font-weight: 800;
+            color: #111827;
+            font-size: 0.95rem;
+        }
+        .sport-meta {
+            display: block;
+            margin-top: 3px;
+            color: #2C7E34;
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
+        .suivi-row--comment {
+            align-items: flex-start;
+        }
+        .suivi-row--comment .suivi-row-left {
+            padding-top: 2px;
+        }
+        .suivi-comment-text {
+            display: block;
+            text-align: right;
+            max-width: min(280px, 58%);
+            color: #374151;
+            font-size: 0.86rem;
+            line-height: 1.45;
+            font-weight: 500;
+        }
         .suivi-actions-inline {
             display: flex;
             flex-wrap: wrap;
@@ -642,16 +757,61 @@ $emptyAfterFilter = !$noSuivisEver && $suivisFiltered === [];
             min-width: 0;
         }
         .points-card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
-            background: #2C7E34;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
             flex-shrink: 0;
+            width: 58px;
+            height: 58px;
+        }
+        .points-coin {
+            position: relative;
+            width: 58px;
+            height: 58px;
+            filter: drop-shadow(0 5px 14px rgba(30, 107, 42, 0.38));
+        }
+        .points-coin__rim {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: conic-gradient(
+                from 200deg,
+                #6ee680 0deg,
+                #2c7e34 70deg,
+                #1a5528 140deg,
+                #358f42 220deg,
+                #5ed86f 300deg,
+                #6ee680 360deg
+            );
+            box-shadow:
+                inset 0 2px 4px rgba(255, 255, 255, 0.38),
+                inset 0 -4px 8px rgba(0, 0, 0, 0.28);
+        }
+        .points-coin__face {
+            position: absolute;
+            inset: 5px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 38% 32%, #6ed97f 0%, #43b556 38%, #2c7e34 72%, #247a32 100%);
+            box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.22);
+        }
+        .points-coin__star {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 30px;
+            height: 30px;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            clip-path: polygon(
+                50% 2%,
+                61% 36%,
+                96% 36%,
+                67% 56%,
+                78% 90%,
+                50% 68%,
+                22% 90%,
+                33% 56%,
+                4% 36%,
+                39% 36%
+            );
+            filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.12));
         }
         .points-card-left h3 {
             margin: 0 0 4px;
@@ -732,46 +892,15 @@ require __DIR__ . '/includes/nav_front.php';
 
 <?php if ($guestHealthSpace): ?>
 <div class="page-header">
-    <h1>Espace santé</h1>
-    <p>Suivi du profil et des habitudes quotidiennes. Connectez-vous pour accéder à votre tableau de bord personnel.</p>
+    <h1><?php echo fo_e('health.title'); ?></h1>
+    <p><?php echo fo_e('health.guest_intro'); ?></p>
 </div>
 
 <?php else: ?>
 
-<?php if ($healthNotice === 'suivi_saved'): ?>
-<div class="health-flash health-flash--ok">Suivi journalier enregistré pour aujourd’hui.</div>
-
-<?php elseif ($healthNotice === 'suivi_db_error'): ?>
-<div class="health-flash health-flash--err">Impossible d’enregistrer le suivi. Vérifiez les champs ou la base de données.</div>
-
-<?php elseif ($healthNotice === 'ia_plus'): ?>
-<div class="health-flash health-flash--ok">Analyse IA terminée : bravo, vous avez gagné +10 points santé.</div>
-
-<?php elseif ($healthNotice === 'ia_minus'): ?>
-<div class="health-flash health-flash--err">Analyse IA terminée : votre suivi n’est pas assez aligné. -10 points santé.</div>
-
-<?php elseif ($healthNotice === 'ia_done'): ?>
-<div class="health-flash health-flash--err">L’analyse IA a déjà été effectuée pour aujourd’hui.</div>
-
-<?php elseif ($healthNotice === 'ia_no_suivi'): ?>
-<div class="health-flash health-flash--err">Aucun suivi journalier pour aujourd’hui. Enregistrez votre suivi avant de lancer l’analyse IA.</div>
-
-<?php elseif ($healthNotice === 'ia_profile'): ?>
-<div class="health-flash health-flash--err">Ce profil santé ne correspond pas à votre compte ou est introuvable.</div>
-
-<?php elseif ($healthNotice === 'ia_api_key'): ?>
-<div class="health-flash health-flash--err">Clé API OpenAI manquante. Choisissez une option : (1) créez le fichier <code style="font-size:0.9em;">config/openai.key</code> et collez votre clé <strong>seule</strong> sur la 1<sup>re</sup> ligne (voir <code style="font-size:0.9em;">config/openai.key.example</code>) ; ou (2) dans <code style="font-size:0.9em;">config/secrets.php</code>, remplacez les guillemets vides par votre clé dans <code style="font-size:0.9em;">OPENAI_API_KEY</code> ; ou (3) variable d’environnement <code style="font-size:0.9em;">OPENAI_API_KEY</code>.</div>
-
-<?php elseif ($healthNotice === 'ia_ai_fail'): ?>
-<div class="health-flash health-flash--err">L’API IA n’a pas renvoyé une réponse valide. Vérifiez la clé, votre connexion, ou réessayez plus tard.</div>
-
-<?php elseif ($healthNotice === 'ia_error'): ?>
-<div class="health-flash health-flash--err">Impossible de lancer l’analyse IA pour le moment.</div>
-<?php endif; ?>
-
 <div class="page-header">
-    <h1>Espace santé de l&rsquo;utilisateur</h1>
-    <p>Suivi complet du profil et des habitudes quotidiennes.</p>
+    <h1><?php echo fo_e('health.user_space_heading'); ?></h1>
+    <p><?php echo fo_e('health.user_space_sub'); ?></p>
 </div>
 
 <div class="user-info-grid">
@@ -785,14 +914,14 @@ require __DIR__ . '/includes/nav_front.php';
     <div class="info-card">
         <i class="fas fa-user"></i>
         <div>
-            <span>Prénom</span>
+            <span><?php echo fo_e('health.first_name'); ?></span>
             <strong><?php echo htmlspecialchars($user['prenom'], ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
     <div class="info-card">
         <i class="fas fa-user-tag"></i>
         <div>
-            <span>Nom</span>
+            <span><?php echo fo_e('health.last_name'); ?></span>
             <strong><?php echo htmlspecialchars($user['nom'], ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
@@ -808,73 +937,72 @@ require __DIR__ . '/includes/nav_front.php';
 <hr>
 
 <div class="card">
-    <h2>Profil santé</h2>
+    <h2><?php echo fo_e('health.profile_section'); ?></h2>
 
     <?php if ($profil !== null): ?>
 
         <div class="profil-grid">
             <div class="profil-item">
                 <i class="fas fa-ruler-vertical icon"></i>
-                <h4>Taille</h4>
+                <h4><?php echo fo_e('health.height'); ?></h4>
                 <p><?php echo htmlspecialchars((string) ($profil['taille'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?> cm</p>
             </div>
             <div class="profil-item">
                 <i class="fas fa-weight-scale icon"></i>
-                <h4>Poids</h4>
+                <h4><?php echo fo_e('health.weight'); ?></h4>
                 <p><?php echo htmlspecialchars((string) ($profil['poids_actuel'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?> kg</p>
             </div>
             <div class="profil-item">
                 <i class="fas fa-bullseye icon"></i>
-                <h4>Objectif</h4>
+                <h4><?php echo fo_e('health.goal_label'); ?></h4>
                 <p><?php echo htmlspecialchars((string) ($profil['objectif'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
             <div class="profil-item">
                 <i class="fas fa-utensils icon"></i>
-                <h4>Allergènes</h4>
-                <p><?php echo !empty($profil['allergenes']) ? htmlspecialchars(implode(', ', $profil['allergenes']), ENT_QUOTES, 'UTF-8') : 'Aucun'; ?></p>
+                <h4><?php echo fo_e('health.allergens'); ?></h4>
+                <p><?php echo !empty($profil['allergenes']) ? htmlspecialchars(implode(', ', $profil['allergenes']), ENT_QUOTES, 'UTF-8') : fo_t('fridge.none'); ?></p>
             </div>
             <div class="profil-item">
                 <i class="fas fa-pills icon"></i>
-                <h4>Carences</h4>
-                <p><?php echo !empty($profil['carences']) ? htmlspecialchars(implode(', ', $profil['carences']), ENT_QUOTES, 'UTF-8') : 'Aucune'; ?></p>
+                <h4><?php echo fo_e('health.deficiencies'); ?></h4>
+                <p><?php echo !empty($profil['carences']) ? htmlspecialchars(implode(', ', $profil['carences']), ENT_QUOTES, 'UTF-8') : fo_t('health.none_f'); ?></p>
             </div>
             <div class="profil-item">
                 <i class="fas fa-heart-pulse icon"></i>
-                <h4>Maladies</h4>
-                <p><?php echo !empty($profil['maladies']) ? htmlspecialchars(implode(', ', $profil['maladies']), ENT_QUOTES, 'UTF-8') : 'Aucune'; ?></p>
+                <h4><?php echo fo_e('health.diseases'); ?></h4>
+                <p><?php echo !empty($profil['maladies']) ? htmlspecialchars(implode(', ', $profil['maladies']), ENT_QUOTES, 'UTF-8') : fo_t('health.none_f'); ?></p>
             </div>
         </div>
         <div class="points-card">
             <div class="points-card-left">
-                <div class="points-card-icon">
-                    <i class="fas fa-star"></i>
+                <div class="points-card-icon" aria-hidden="true">
+                    <div class="points-coin">
+                        <span class="points-coin__rim"></span>
+                        <span class="points-coin__face"></span>
+                        <span class="points-coin__star"></span>
+                    </div>
                 </div>
                 <div>
-                    <h3>Mes points santé</h3>
+                    <h3><?php echo fo_e('health.my_points'); ?></h3>
                     <p>
                         <strong><?php echo htmlspecialchars((string) ($profil['points'] ?? 0), ENT_QUOTES, 'UTF-8'); ?></strong>
-                        points
+                        <?php echo fo_e('health.points'); ?>
                     </p>
                 </div>
             </div>
-
-            <a href="analyse_gamification.php?id_profil_sante=<?php echo (int) $profil['id']; ?>" class="caloryeye-analyse-btn">
-                <img src="images/analyse.png" alt="" class="caloryeye-analyse-btn__icon" width="22" height="22">
-                <span class="caloryeye-analyse-btn__label">Lancer l’analyse IA du jour</span>
-            </a>
         </div>
         <div class="profil-actions">
-            <a href="edit.php" class="btn-edit">Modifier le profil</a>
-            <form method="post" action="delete_profil_sante.php" onsubmit="return confirm('Supprimer votre profil santé ? Cette action est difficile à annuler.');">
-                <button type="submit" class="btn-delete_profil">Supprimer le profil</button>
+            <a href="<?php echo htmlspecialchars(fo_sante_list_url('edit', 0, $foSantePreserve), ENT_QUOTES, 'UTF-8'); ?>" class="btn-edit"><?php echo fo_e('health.edit_profile'); ?></a>
+            <form method="post" action="delete_profil_sante.php" onsubmit="return hbConfirmFormSubmit(this, <?php echo json_encode(fo_t('health.delete_profile_confirm'), JSON_UNESCAPED_UNICODE); ?>);">
+                <button type="submit" class="btn-delete_profil"><?php echo fo_e('health.delete_profile'); ?></button>
             </form>
         </div>
 
     <?php else: ?>
 
-        <p class="health-muted" style="text-align:center;">Aucun profil santé pour votre compte.</p>
+        <p class="health-muted" style="text-align:center;"><?php echo fo_e('health.no_profile_account'); ?></p>
         <div class="profil-actions">
-            <a href="create.php" class="btn-add">Créer profil santé</a>
+            <a href="<?php echo htmlspecialchars(fo_sante_list_url('create', 0, $foSantePreserve), ENT_QUOTES, 'UTF-8'); ?>" class="btn-add"><?php echo fo_e('health.create_profile_btn'); ?></a>
         </div>
 
     <?php endif; ?>
@@ -884,23 +1012,23 @@ require __DIR__ . '/includes/nav_front.php';
 <hr>
 
 <div class="card">
-    <h2>Suivis journaliers</h2>
+    <h2><?php echo fo_e('health.daily_tracking'); ?></h2>
 
     <?php if ($profil === null): ?>
-        <p class="health-muted" style="text-align:center;">Créez d’abord un profil santé pour enregistrer des suivis journaliers.</p>
+        <p class="health-muted" style="text-align:center;"><?php echo fo_e('health.create_profile_first'); ?></p>
     <?php else: ?>
 
         <div class="suivi-toolbar">
-            <a href="createSuivi.php" class="btn-add">+ Ajouter suivis journaliers</a>
+            <a href="<?php echo htmlspecialchars(fo_sante_list_url('create_suivi', 0, $foSantePreserve), ENT_QUOTES, 'UTF-8'); ?>" class="btn-add"><?php echo fo_e('health.add_tracking'); ?></a>
             <div class="search-suivi-wrap">
                 <form id="searchForm" class="search-suivi" method="get" action="user_health_space.php">
                     <div class="search-suivi-box">
                         <i class="fas fa-calendar" style="color:var(--hb-forest,#2C7E34);"></i>
                         <input type="date" name="date" value="<?php echo htmlspecialchars($date, ENT_QUOTES, 'UTF-8'); ?>">
-                        <button type="submit" class="btn-filter">Rechercher</button>
+                        <button type="submit" class="btn-filter"><?php echo fo_e('health.search'); ?></button>
 
                         <select name="sort">
-                            <option value="">Tri par défaut (date)</option>
+                            <option value=""><?php echo fo_e('health.sort_default'); ?></option>
                             <option value="poids_asc" <?php echo $sort === 'poids_asc' ? 'selected' : ''; ?>>Poids ↑</option>
                             <option value="poids_desc" <?php echo $sort === 'poids_desc' ? 'selected' : ''; ?>>Poids ↓</option>
                             <option value="calories_asc" <?php echo $sort === 'calories_asc' ? 'selected' : ''; ?>>Calories ↑</option>
@@ -911,8 +1039,8 @@ require __DIR__ . '/includes/nav_front.php';
                             <option value="pas_desc" <?php echo $sort === 'pas_desc' ? 'selected' : ''; ?>>Pas ↓</option>
                         </select>
 
-                        <button type="submit" class="btn-filter">Filtrer</button>
-                        <button type="button" id="resetFilter" class="btn-cancel-green">Annuler</button>
+                        <button type="submit" class="btn-filter"><?php echo fo_e('health.filter'); ?></button>
+                        <button type="button" id="resetFilter" class="btn-cancel-green"><?php echo fo_e('common.cancel'); ?></button>
                     </div>
                 </form>
             </div>
@@ -942,17 +1070,39 @@ require __DIR__ . '/includes/nav_front.php';
                             ENT_QUOTES,
                             'UTF-8'
                         );
-                        $nSport = (int) ($suivi['nbr_activites_sport'] ?? 0);
-                        if ($nSport === 0) {
-                            $sportTxt = '0 séance';
-                        } elseif ($nSport === 1) {
-                            $sportTxt = '1 séance';
+                        $sportType = trim((string) ($suivi['sport_type'] ?? ''));
+                        $sportDuree = (int) ($suivi['sport_duree_minutes'] ?? 0);
+                        $sportIntensite = trim((string) ($suivi['sport_intensite'] ?? ''));
+                        $sportCommentaire = trim((string) ($suivi['sport_commentaire'] ?? ''));
+                        if ($sportType === '') {
+                            $sportType = 'aucune';
+                        }
+                        if ($sportType === 'aucune') {
+                            $sportDuree = 0;
+                            $sportIntensite = 'aucune';
+                        }
+                        if ($sportIntensite === '') {
+                            $sportIntensite = $sportType === 'aucune' ? 'aucune' : 'moyenne';
+                        }
+                        $sportLabel = hb_sport_label($sportType);
+                        $sportIntensiteLabel = hb_intensite_label($sportIntensite);
+                        if ($sportType === 'aucune') {
+                            $sportDetailsTxt = fo_t('health.sport_none');
                         } else {
-                            $sportTxt = $nSport . ' séances';
+                            $sportDetailsTxt = sprintf(
+                                fo_t('health.sport_duration_min'),
+                                $sportDuree
+                            ) . ' · ' . sprintf(fo_t('health.sport_intensity'), $sportIntensiteLabel);
                         }
                         $hydRaw = (string) ($suivi['hydratation_litre'] ?? '');
+                        $hydLabels = [
+                            'moins_1L' => fo_t('health.hydration.less_1l'),
+                            '1_1.5L' => fo_t('health.hydration.between_1_1_5l'),
+                            '1.5_2L' => fo_t('health.hydration.between_1_5_2l'),
+                            'plus_2L' => fo_t('health.hydration.more_2l'),
+                        ];
                         $hydTxt = $hydRaw !== ''
-                            ? htmlspecialchars($hydRaw, ENT_QUOTES, 'UTF-8')
+                            ? htmlspecialchars($hydLabels[$hydRaw] ?? $hydRaw, ENT_QUOTES, 'UTF-8')
                             : '—';
                         ?>
                         <div class="card-suivi">
@@ -963,39 +1113,48 @@ require __DIR__ . '/includes/nav_front.php';
                             </div>
                             <div class="card-suivi-body">
                                 <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-weight-scale" style="color:#2C7E34;"></i> Poids</span>
+                                    <span class="suivi-row-left"><i class="fas fa-weight-scale" style="color:#2C7E34;"></i> <?php echo fo_e('health.weight'); ?></span>
                                     <strong class="suivi-row-val"><?php echo htmlspecialchars($poidsTxt, ENT_QUOTES, 'UTF-8'); ?></strong>
                                 </div>
                                 <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-fire" style="color:#ea580c;"></i> Calories</span>
+                                    <span class="suivi-row-left"><i class="fas fa-fire" style="color:#ea580c;"></i> <?php echo fo_e('fridge.calories'); ?></span>
                                     <strong class="suivi-row-val"><?php echo $calTxt; ?></strong>
                                 </div>
                                 <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-moon" style="color:#7c3aed;"></i> Sommeil</span>
+                                    <span class="suivi-row-left"><i class="fas fa-moon" style="color:#7c3aed;"></i> <?php echo fo_e('health.sleep'); ?></span>
                                     <strong class="suivi-row-val"><?php echo htmlspecialchars($somTxt, ENT_QUOTES, 'UTF-8'); ?></strong>
                                 </div>
                                 <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-shoe-prints" style="color:#2563eb;"></i> Pas</span>
+                                    <span class="suivi-row-left"><i class="fas fa-shoe-prints" style="color:#2563eb;"></i> <?php echo fo_e('health.steps'); ?></span>
                                     <strong class="suivi-row-val"><?php echo $pasTxt; ?></strong>
                                 </div>
-                                <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-running" style="color:#2C7E34;"></i> Sport</span>
-                                    <strong class="suivi-row-val"><?php echo htmlspecialchars($sportTxt, ENT_QUOTES, 'UTF-8'); ?></strong>
+                                <div class="suivi-row suivi-row--sport">
+                                    <span class="suivi-row-left"><i class="fas fa-running" style="color:#2C7E34;"></i> <?php echo fo_e('health.sport'); ?></span>
+                                    <span class="sport-summary">
+                                        <span class="sport-main"><?php echo htmlspecialchars($sportLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+                                        <span class="sport-meta"><?php echo htmlspecialchars($sportDetailsTxt, ENT_QUOTES, 'UTF-8'); ?></span>
+                                    </span>
                                 </div>
                                 <div class="suivi-row">
-                                    <span class="suivi-row-left"><i class="fas fa-tint" style="color:#0891b2;"></i> Hydratation</span>
+                                    <span class="suivi-row-left"><i class="fas fa-tint" style="color:#0891b2;"></i> <?php echo fo_e('health.hydration'); ?></span>
                                     <strong class="suivi-row-val"><?php echo $hydTxt; ?></strong>
                                 </div>
+                                <?php if ($sportCommentaire !== ''): ?>
+                                <div class="suivi-row suivi-row--comment">
+                                    <span class="suivi-row-left"><i class="fas fa-comment-dots" style="color:#2C7E34;"></i> <?php echo fo_e('health.suivi_comment'); ?></span>
+                                    <span class="suivi-comment-text"><?php echo htmlspecialchars($sportCommentaire, ENT_QUOTES, 'UTF-8'); ?></span>
+                                </div>
+                                <?php endif; ?>
                             </div>
                             <div class="card-suivi-foot">
                                 <div class="suivi-actions-inline">
-                                    <button type="button" class="btn-conseil" onclick="afficherConseil(<?php echo (int) ($suivi['id'] ?? 0); ?>)" title="Conseil du jour" aria-label="Conseil du jour">
+                                    <button type="button" class="btn-conseil" onclick="afficherConseil(<?php echo (int) ($suivi['id'] ?? 0); ?>)" title="<?php echo fo_e('health.daily_tip'); ?>" aria-label="<?php echo fo_e('health.daily_tip'); ?>">
                                         <span class="btn-conseil__iconwrap" aria-hidden="true"></span>
                                     </button>
-                                    <a href="editSuivi.php?id=<?php echo (int) ($suivi['id'] ?? 0); ?>" class="btn-edit">Modifier</a>
-                                    <form method="post" action="delete_suivi_journalier.php" onsubmit="return confirm('Supprimer ce suivi ?');">
+                                    <a href="<?php echo htmlspecialchars(fo_sante_list_url('edit_suivi', (int) ($suivi['id'] ?? 0), $foSantePreserve), ENT_QUOTES, 'UTF-8'); ?>" class="btn-edit"><?php echo fo_e('common.edit'); ?></a>
+                                    <form method="post" action="delete_suivi_journalier.php" onsubmit="return hbConfirmFormSubmit(this, <?php echo json_encode(fo_t('health.delete_tracking_confirm'), JSON_UNESCAPED_UNICODE); ?>);">
                                         <input type="hidden" name="id" value="<?php echo (int) ($suivi['id'] ?? 0); ?>">
-                                        <button type="submit" class="btn-delete">Supprimer</button>
+                                        <button type="submit" class="btn-delete"><?php echo fo_e('common.delete'); ?></button>
                                     </form>
                                 </div>
                             </div>
@@ -1005,11 +1164,11 @@ require __DIR__ . '/includes/nav_front.php';
                     <p class="health-empty">
                         <?php
                         if ($noSuivisEver) {
-                            echo 'Aucun suivi journalier enregistré.';
+                            echo fo_t('health.empty_tracking');
                         } elseif ($emptyAfterFilter || $hasFilter || $sort !== '') {
-                            echo 'Aucun résultat pour ces critères.';
+                            echo fo_t('health.empty_filter');
                         } else {
-                            echo 'Aucun suivi à afficher sur cette page.';
+                            echo fo_t('health.empty_page');
                         }
                         ?>
                     </p>
@@ -1018,7 +1177,7 @@ require __DIR__ . '/includes/nav_front.php';
 
             <div class="pagination" id="pagination">
                 <button type="button" class="btn-page" onclick="loadPage(<?php echo $page - 1; ?>)" <?php echo $page <= 1 ? 'disabled' : ''; ?>>&lt;</button>
-                <span class="page-info">Page <?php echo (int) $page; ?> / <?php echo (int) $totalPages; ?></span>
+                <span class="page-info"><?php echo htmlspecialchars(sprintf(fo_t('health.page_n'), (int) $page, (int) $totalPages), ENT_QUOTES, 'UTF-8'); ?></span>
                 <button type="button" class="btn-page" onclick="loadPage(<?php echo $page + 1; ?>)" <?php echo $page >= $totalPages ? 'disabled' : ''; ?>>&gt;</button>
             </div>
 
@@ -1028,9 +1187,9 @@ require __DIR__ . '/includes/nav_front.php';
 
 <div id="popup" class="popup">
     <div class="popup-box">
-        <h3>Conseil du jour</h3>
+        <h3><?php echo fo_e('health.daily_tip'); ?></h3>
         <div id="popupContent"></div>
-        <button type="button" class="btn-popup-fermer" onclick="fermerPopup()">Fermer</button>
+        <button type="button" class="btn-popup-fermer" onclick="fermerPopup()"><?php echo fo_e('common.close'); ?></button>
     </div>
 </div>
 
@@ -1050,18 +1209,17 @@ function afficherConseil(id) {
         .then(function(r) {
             var data = r.data;
             if (data.error) {
-                alert(data.error);
+                (window.hbAlert || alert)(data.error);
                 return;
             }
             if (!r.ok) {
-                alert('Erreur serveur (' + r.status + ')');
+                (window.hbAlert || alert)(<?php echo json_encode(fo_t('health.server_error'), JSON_UNESCAPED_UNICODE); ?> + ' (' + r.status + ')');
                 return;
             }
-            document.getElementById('popupContent').innerHTML =
-                '<div class="conseil-box">' + (data.conseil_ai || '') + '</div>';
+            document.getElementById('popupContent').innerHTML = data.conseil_ai || '';
             document.getElementById('popup').style.display = 'flex';
         })
-        .catch(function() { alert('Erreur serveur'); });
+        .catch(function() { (window.hbAlert || alert)(<?php echo json_encode(fo_t('health.server_error'), JSON_UNESCAPED_UNICODE); ?>); });
 }
 function fermerPopup() {
     document.getElementById('popup').style.display = 'none';
@@ -1081,7 +1239,7 @@ function loadPage(page) {
             if (pg) document.getElementById('pagination').innerHTML = pg.innerHTML;
             window.history.pushState({}, '', url);
         })
-        .catch(function() { alert('Erreur chargement'); });
+        .catch(function() { (window.hbAlert || alert)('Erreur chargement'); });
 }
 
 var searchForm = document.getElementById('searchForm');
@@ -1110,7 +1268,7 @@ if (searchForm) {
                 if (pg) document.getElementById('pagination').innerHTML = pg.innerHTML;
                 window.history.pushState({}, '', url);
             })
-            .catch(function() { alert('Erreur recherche'); });
+            .catch(function() { (window.hbAlert || alert)('Erreur recherche'); });
     });
 }
 
@@ -1165,7 +1323,30 @@ if (resetBtn) {
     © 2026 HappyBite
 </footer>
 
-<?php if ($guestHealthSpace) {
+<?php
+if (!$guestHealthSpace) {
+    fo_sante_inline_render_panel(false);
+}
+require_once __DIR__ . '/includes/hb_action_toast.php';
+$healthToastMsg = '';
+$healthToastStrip = false;
+if (!$guestHealthSpace) {
+    if (!empty($_SESSION['hb_sante_toast_warn'])) {
+        $healthToastMsg = (string) $_SESSION['hb_sante_toast_warn'];
+        unset($_SESSION['hb_sante_toast_warn']);
+    } elseif ($healthNotice !== '') {
+        $foSanteInlineOpen = fo_sante_inline_current_mode() !== '';
+        $suiviNotices = ['suivi_saved', 'suivi_updated', 'suivi_deleted'];
+        if (!$foSanteInlineOpen || !in_array($healthNotice, $suiviNotices, true)) {
+            $healthToastMsg = hb_health_notice_message($healthNotice) ?? '';
+            if ($healthToastMsg !== '') {
+                $healthToastStrip = true;
+            }
+        }
+    }
+}
+hb_action_toast_script($healthToastMsg !== '' ? $healthToastMsg : null, 3500, $healthToastStrip, ['notice']);
+if ($guestHealthSpace) {
     require __DIR__ . '/includes/guest_login_gate.php';
 } ?>
 

@@ -1,4 +1,6 @@
 <?php
+$boCatalogInline = defined('BO_CATALOG_INLINE') && BO_CATALOG_INLINE;
+
 include __DIR__ . '/../Controllers/RecetteController.php';
 include __DIR__ . '/../Controllers/ProduitController.php';
 require_once __DIR__ . '/../Models/Recette.php';
@@ -11,10 +13,19 @@ $produitController = new ProduitController();
 $produits = $produitController->listProduits();
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
-    die("ID de la recette manquant.");
+    if (!$boCatalogInline) {
+        die('ID de la recette manquant.');
+    }
+    return;
 }
 
 $id = (int) $_GET['id'];
+
+if (!$boCatalogInline && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $q = isset($_GET['embed']) ? '?embed=1&' : '?';
+    header('Location: List-Recette.php' . $q . 'action=edit&id=' . $id . '#bo-inline-crud');
+    exit;
+}
 $recetteData = $recetteController->getRecetteById($id);
 
 if (!$recetteData) {
@@ -113,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $recetteController->supprimerProduitsRecette($id);
             $recetteController->ajouterProduitsRecette($id, $produitsSelectionnes);
 
-            header('Location: List-Recette.php');
-            exit;
+            require_once __DIR__ . '/includes/bo_inline_crud.php';
+            bo_catalog_save_redirect('List-Recette.php');
         } else {
             $errors[] = "Erreur lors de la modification de la recette.";
         }
@@ -122,12 +133,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $error = $errors;
 }
+
+if ($boCatalogInline) {
+    $listBackUrl = 'List-Recette.php';
+    if (isset($_GET['embed']) && (string) $_GET['embed'] !== '0') {
+        $listBackUrl .= '?embed=1';
+    }
+    require __DIR__ . '/includes/partials/bo_recette_edit_form_inline.php';
+    return;
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <title>Modifier une recette</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">

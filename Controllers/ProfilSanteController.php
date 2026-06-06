@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/ProfilSante.php';
 require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/UserNotificationService.php';
 
 class ProfilSanteController
 {
@@ -47,6 +48,11 @@ class ProfilSanteController
 'c' => json_encode($_POST['carences'] ?? [], JSON_UNESCAPED_UNICODE),
 'm' => json_encode($_POST['maladies'] ?? [], JSON_UNESCAPED_UNICODE),
             ]);
+
+            try {
+                user_notification_send_sante_welcome($this->db, (int) $id_utilisateur);
+            } catch (Throwable $e) {
+            }
 
             $this->redirectHealth($id_utilisateur);
         }

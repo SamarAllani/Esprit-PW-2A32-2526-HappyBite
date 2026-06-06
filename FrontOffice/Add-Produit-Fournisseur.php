@@ -1,8 +1,21 @@
-﻿<?php
+<?php
+
+declare(strict_types=1);
+
+$foCatalogInline = defined('FO_CATALOG_INLINE') && FO_CATALOG_INLINE;
+
+if (!$foCatalogInline && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    require_once __DIR__ . '/includes/fo_inline_crud.php';
+    header('Location: ' . fo_inline_crud_list_url('List-Produit-Fournisseur.php', 'add', 0, fo_inline_preserve_list_query()));
+    exit;
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../Controllers/ProduitController.php';
 require_once __DIR__ . '/../Controllers/CategorieController.php';
@@ -152,92 +165,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $produitController->addProduit($produit);
 
-        header('Location: List-Produit-Fournisseur.php');
-        exit;
+        require_once __DIR__ . '/includes/fo_inline_crud.php';
+        fo_catalog_save_redirect('List-Produit-Fournisseur.php', array_merge(fo_inline_preserve_list_query(), ['notice' => 'product_added']));
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Ajouter un produit — Fournisseur</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/style-original-views.css">
-    <style>
-        html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        .image-preview {
-            max-width: 160px;
-            max-height: 160px;
-            border-radius: 12px;
-            margin-top: 10px;
-            border: 1px solid #dee2e6;
-            object-fit: cover;
-            display: none;
-        }
-    </style>
-</head>
-<body>
 
+require_once __DIR__ . '/includes/fo_inline_crud.php';
+$foListCloseUrl = fo_inline_crud_list_url('List-Produit-Fournisseur.php', '', 0, fo_inline_preserve_list_query());
+?>
+<div class="fo-catalog-inline-form">
 <main class="commande-wrap">
 <div class="container py-5">
     <div class="text-center mb-4">
-        <h2 class="fw-bold">Ajouter un produit</h2>
-        <p class="text-muted">Le produit sera publié sous votre compte fournisseur</p>
+        <h2 class="fw-bold"><?php echo fo_e('supplier.add_heading'); ?></h2>
+        <p class="text-muted"><?php echo fo_e('supplier.add_sub'); ?></p>
     </div>
 
     <div class="d-flex justify-content-center gap-3 mb-4 flex-wrap">
-        <a href="List-Produit-Fournisseur.php" class="btn btn-outline-secondary rounded-pill px-4">Mes produits</a>
-        <a href="List-Produit.php" class="btn btn-outline-success rounded-pill px-4">Catalogue public</a>
+        <a href="List-Produit-Fournisseur.php" class="btn btn-outline-secondary rounded-pill px-4"><?php echo fo_e('supplier.my_products'); ?></a>
+        <a href="List-Produit.php" class="btn btn-outline-success rounded-pill px-4"><?php echo fo_e('supplier.public_catalog'); ?></a>
     </div>
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 rounded-4">
                 <div class="card-header bg-success rounded-top-4 py-3">
-                    <h3 class="mb-0 fw-bold text-white" style="color: #fff !important;">Formulaire</h3>
+                    <h3 class="mb-0 fw-bold text-white" style="color: #fff !important;"><?php echo fo_e('supplier.form_title'); ?></h3>
                 </div>
                 <div class="card-body p-4">
-                    <?php if ($error !== '') { ?>
-                        <div class="alert alert-danger rounded-3"><?php echo htmlspecialchars($error); ?></div>
-                    <?php } ?>
-
-                    <form method="POST" action="" enctype="multipart/form-data">
+                    <form method="POST" action="Add-Produit-Fournisseur.php" enctype="multipart/form-data">
+                        <input type="hidden" name="fo" value="add">
                         <div class="mb-3">
-                            <label for="nom" class="form-label">Nom du produit</label>
+                            <label for="nom" class="form-label"><?php echo fo_e('supplier.field_name'); ?></label>
                             <input type="text" class="form-control" id="nom" name="nom" required
                                    value="<?php echo isset($_POST['nom']) ? htmlspecialchars((string) $_POST['nom']) : ''; ?>">
                         </div>
 
                         <div class="mb-3">
-                            <label for="prix" class="form-label">Prix (DT)</label>
+                            <label for="prix" class="form-label"><?php echo fo_e('supplier.field_price'); ?></label>
                             <input type="text" class="form-control" id="prix" name="prix" required
                                    value="<?php echo isset($_POST['prix']) ? htmlspecialchars((string) $_POST['prix']) : ''; ?>">
                         </div>
 
                         <div class="mb-3">
-                            <label for="image" class="form-label">Image</label>
+                            <label for="image" class="form-label"><?php echo fo_e('supplier.field_image'); ?></label>
                             <input type="file" class="form-control" id="image" name="image" accept="image/*" required>
-                            <img id="imagePreview" class="image-preview" alt="Aperçu">
+                            <img id="imagePreview" class="image-preview" alt="<?php echo fo_e('auth.photo_preview'); ?>">
                         </div>
 
                         <div class="mb-3">
-                            <label for="calories" class="form-label">Calories</label>
+                            <label for="calories" class="form-label"><?php echo fo_e('supplier.field_calories'); ?></label>
                             <input type="text" class="form-control" id="calories" name="calories"
                                    value="<?php echo isset($_POST['calories']) ? htmlspecialchars((string) $_POST['calories']) : ''; ?>">
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_categorie" class="form-label">Catégorie</label>
+                            <label for="id_categorie" class="form-label"><?php echo fo_e('supplier.field_category'); ?></label>
                             <select class="form-select" id="id_categorie" name="id_categorie" required>
-                                <option value="">-- Choisir une catégorie --</option>
+                                <option value=""><?php echo fo_e('supplier.choose_category'); ?></option>
                                 <?php foreach ($categories as $categorie) { ?>
                                     <option value="<?php echo (int) $categorie->getIdCategorie(); ?>"
                                         <?php echo (isset($_POST['id_categorie']) && (string) $_POST['id_categorie'] === (string) $categorie->getIdCategorie()) ? 'selected' : ''; ?>>
@@ -248,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Allergènes / composants sensibles</label>
+                            <label class="form-label"><?php echo fo_e('supplier.field_allergens'); ?></label>
                             <?php foreach ($listeAllergenes as $item) { ?>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="allergenes[]" value="<?php echo htmlspecialchars($item); ?>"
@@ -260,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label">Bénéfices</label>
+                            <label class="form-label"><?php echo fo_e('supplier.field_benefits'); ?></label>
                             <?php foreach ($listeBenefices as $item) { ?>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="benefices_list[]" value="<?php echo htmlspecialchars($item); ?>"
@@ -272,8 +257,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="d-flex flex-wrap gap-2 justify-content-between">
-                            <a href="List-Produit-Fournisseur.php" class="btn btn-outline-secondary rounded-pill px-4">Annuler</a>
-                            <button type="submit" class="btn btn-success rounded-pill px-4">Enregistrer le produit</button>
+                            <a href="<?php echo htmlspecialchars($foListCloseUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary rounded-pill px-4"><?php echo fo_e('common.cancel'); ?></a>
+                            <button type="submit" class="btn btn-success rounded-pill px-4"><?php echo fo_e('supplier.save_product'); ?></button>
                         </div>
                     </form>
                 </div>
@@ -282,28 +267,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 </div>
 </main>
-
-<footer>
-    © 2026 HappyBite
-</footer>
-
-<script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+</div>
+<style>
+.fo-catalog-inline-form .image-preview {
+    max-width: 160px;
+    max-height: 160px;
+    border-radius: 12px;
+    margin-top: 10px;
+    border: 1px solid #dee2e6;
+    object-fit: cover;
+    display: none;
+}
+</style>
 <script>
-document.getElementById('image').addEventListener('change', function (event) {
-    var file = event.target.files[0];
+(function () {
+    var input = document.getElementById('image');
     var preview = document.getElementById('imagePreview');
-    if (file) {
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    } else {
-        preview.src = '';
-        preview.style.display = 'none';
-    }
-});
+    if (!input || !preview) return;
+    input.addEventListener('change', function (event) {
+        var file = event.target.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.src = '';
+            preview.style.display = 'none';
+        }
+    });
+})();
 </script>
-</body>
-</html>
+<?php
+require_once __DIR__ . '/includes/hb_action_toast.php';
+hb_action_toast_script($error !== '' ? $error : null, 5000);
+?>

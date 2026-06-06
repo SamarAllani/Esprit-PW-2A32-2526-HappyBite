@@ -8,7 +8,8 @@ declare(strict_types=1);
  */
 
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -17,13 +18,28 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../config/Database.php';
 require_once __DIR__ . '/../Models/AuthUserModel.php';
 require_once __DIR__ . '/AuthFaceSupport.php';
+require_once __DIR__ . '/PasswordChangeService.php';
+require_once __DIR__ . '/UserNotificationService.php';
+require_once __DIR__ . '/UserSettingsService.php';
 
 $pdo = Database::getConnection();
 $userModel = new AuthUserModel($pdo);
 
-function authApplyLoginSession(array $user): void
+function authApplyLoginSession(PDO $pdo, array $user): void
 {
-    $_SESSION['user_id'] = authUtilisateurIdFromRow($user);
+    $newUid = authUtilisateurIdFromRow($user);
+    $pending = password_change_get_pending();
+    if ($pending !== null && (int) ($pending['user_id'] ?? 0) !== $newUid) {
+        password_change_clear_pending();
+    }
+
+    try {
+        user_settings_load_for_user($pdo, $newUid);
+    } catch (Throwable $e) {
+        user_settings_apply_to_session(null);
+    }
+
+    $_SESSION['user_id'] = $newUid;
     $_SESSION['user_prenom'] = $user['prenom'];
     $_SESSION['user_nom'] = $user['nom'];
     $_SESSION['user_email'] = $user['email'];
@@ -94,7 +110,7 @@ function authHandleProfilePhotoUpload(array $file): ?string
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+    $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
     if ($action === 'login') {
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
@@ -118,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
 
-                authApplyLoginSession($user);
+                authApplyLoginSession($pdo, $user);
 
                 header('Location: ../FrontOffice/Home.php');
                 exit;
@@ -142,9 +158,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         $snapshot = (string) ($_POST['snapshot'] ?? '');
+        $descriptor = authFaceParseDescriptor((string) ($_POST['descriptor'] ?? ''));
         $jpeg = authFaceDecodeSnapshot($snapshot);
-        if ($email === '' || $jpeg === null || strlen($jpeg) < 500) {
-            echo json_encode(['ok' => false, 'error' => 'Email ou image invalide.'], JSON_UNESCAPED_UNICODE);
+        if ($email === '' || $descriptor === null) {
+            echo json_encode(['ok' => false, 'error' => 'Email ou empreinte visage invalide. Réessayez le scan.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($jpeg === null || strlen($jpeg) < 500) {
+            echo json_encode(['ok' => false, 'error' => 'Image de capture invalide.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         if (strlen($jpeg) > 2_500_000) {
@@ -171,6 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $uid = authUtilisateurIdFromRow($user);
+        if (!authFaceSaveDescriptor($uid, $descriptor)) {
+            echo json_encode(['ok' => false, 'error' => 'Échec enregistrement empreinte visage.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $rel = authFaceSaveEnrollmentFile($uid, $jpeg);
         if ($rel === null) {
             echo json_encode(['ok' => false, 'error' => 'Échec enregistrement fichier.'], JSON_UNESCAPED_UNICODE);
@@ -180,6 +205,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pk = authUtilisateurPkColumn($pdo);
         $stmt = $pdo->prepare('UPDATE utilisateur SET face_auth_image = :p WHERE `' . $pk . '` = :id');
         $stmt->execute(['p' => $rel, 'id' => $uid]);
+        if (authColumnExists($pdo, 'utilisateur', 'face_id_auth')) {
+            $flagStmt = $pdo->prepare('UPDATE utilisateur SET face_id_auth = 1 WHERE `' . $pk . '` = :id');
+            $flagStmt->execute(['id' => $uid]);
+        }
         unset($_SESSION['just_registered_email']);
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
         exit;
@@ -193,9 +222,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         $snapshot = (string) ($_POST['snapshot'] ?? '');
+        $liveDescriptor = authFaceParseDescriptor((string) ($_POST['descriptor'] ?? ''));
         $jpeg = authFaceDecodeSnapshot($snapshot);
-        if ($email === '' || $jpeg === null || strlen($jpeg) < 500) {
-            echo json_encode(['ok' => false, 'error' => 'Email ou image invalide.'], JSON_UNESCAPED_UNICODE);
+        if ($email === '' || $liveDescriptor === null) {
+            echo json_encode(['ok' => false, 'error' => 'Email ou empreinte visage invalide. Réessayez le scan.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -209,20 +239,153 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        $uid = authUtilisateurIdFromRow($user);
+        $storedDescriptor = authFaceLoadDescriptor($uid);
         $rel = trim((string) ($user['face_auth_image'] ?? ''));
-        if ($rel === '') {
-            echo json_encode(['ok' => false, 'error' => 'Aucun visage enregistré pour ce compte. Utilisez « Enregistrer Face ID » après inscription.'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-        $abs = dirname(__DIR__) . '/' . $rel;
-        if (!authFaceMatchStored($abs, $jpeg)) {
-            echo json_encode(['ok' => false, 'error' => 'Visage non reconnu. Réessayez avec un bon éclairage.'], JSON_UNESCAPED_UNICODE);
+        if ($storedDescriptor === null && $rel === '') {
+            echo json_encode(['ok' => false, 'error' => 'Aucun visage enregistré. Utilisez « Enregistrer Face ID ».'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
-        authApplyLoginSession($user);
+        $matched = false;
+        if ($storedDescriptor !== null) {
+            $matched = authFaceMatchDescriptorVectors($storedDescriptor, $liveDescriptor);
+        }
+        if (!$matched && $rel !== '' && function_exists('imagecreatefromstring') && $jpeg !== null) {
+            $abs = dirname(__DIR__) . '/' . $rel;
+            $matched = authFaceMatchStored($abs, $jpeg);
+        }
+        if (!$matched) {
+            echo json_encode([
+                'ok' => false,
+                'error' => 'Visage non reconnu. Réenregistrez Face ID (même email) après Ctrl+F5 sur la page.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        authFaceSaveDescriptor($uid, $liveDescriptor);
+        if ($rel !== '' && $jpeg !== null) {
+            $abs = dirname(__DIR__) . '/' . $rel;
+            if (function_exists('imagecreatefromstring')) {
+                @file_put_contents($abs, authFaceNormalizeEnrollmentJpeg($jpeg));
+            } else {
+                @file_put_contents($abs, $jpeg);
+            }
+        }
+
+        authApplyLoginSession($pdo, $user);
         // Toujours rediriger vers le front-office (connexion BO séparée : BackOffice/login.php)
         echo json_encode(['ok' => true, 'redirect' => '../Home.php'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_change_status') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false, 'active' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uid = (int) ($_SESSION['user_id'] ?? 0);
+        $pending = password_change_get_pending();
+        if ($pending === null
+            || (int) ($pending['user_id'] ?? 0) !== $uid
+            || time() > (int) ($pending['expires'] ?? 0)
+        ) {
+            echo json_encode(['ok' => true, 'active' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $pk = authUtilisateurPkColumn($pdo);
+        $faceRequired = password_change_user_has_face_enrolled($pdo, $uid, $pk);
+        $emailOk = !empty($pending['email_verified']);
+        $faceOk = !empty($pending['face_verified']);
+        echo json_encode([
+            'ok' => true,
+            'active' => true,
+            'email_verified' => $emailOk,
+            'face_verified' => $faceOk,
+            'face_required' => $faceRequired,
+            'ready_to_finalize' => $emailOk && ($faceOk || !$faceRequired),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_change_cancel') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $linkNavAt = (int) ($_SESSION['hb_pwd_link_nav'] ?? 0);
+        if ($linkNavAt > 0 && (time() - $linkNavAt) < 12) {
+            unset($_SESSION['hb_pwd_link_nav']);
+            echo json_encode(['ok' => true, 'skipped' => true], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        unset($_SESSION['hb_pwd_link_nav']);
+        password_change_clear_pending();
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_email_answer') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false, 'error' => 'Non connecté.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uid = (int) ($_SESSION['user_id'] ?? 0);
+        $answer = strtolower(trim((string) ($_POST['answer'] ?? '')));
+        if ($answer !== 'yes' && $answer !== 'no') {
+            echo json_encode(['ok' => false, 'error' => 'Réponse invalide.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $pk = authUtilisateurPkColumn($pdo);
+        $result = password_change_confirm_email_answer($uid, $answer, $pdo, $pk);
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_change_request') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false, 'error' => 'Non connecté.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uid = (int) ($_SESSION['user_id'] ?? 0);
+        $pk = authUtilisateurPkColumn($pdo);
+        $email = strtolower(trim((string) ($_SESSION['user_email'] ?? '')));
+        $current = (string) ($_POST['current_password'] ?? '');
+        $new = (string) ($_POST['new_password'] ?? '');
+        $confirm = (string) ($_POST['confirm_password'] ?? '');
+        $result = password_change_start($pdo, $uid, $pk, $email, $current, $new, $confirm);
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_face_verify') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false, 'error' => 'Non connecté.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uid = (int) ($_SESSION['user_id'] ?? 0);
+        $descriptor = (string) ($_POST['descriptor'] ?? '');
+        $jpeg = authFaceDecodeSnapshot((string) ($_POST['snapshot'] ?? ''));
+        $result = password_change_verify_face($pdo, $uid, $descriptor, $jpeg);
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'password_change_finalize') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (empty($_SESSION['logged_in'])) {
+            echo json_encode(['ok' => false, 'error' => 'Non connecté.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uid = (int) ($_SESSION['user_id'] ?? 0);
+        $pk = authUtilisateurPkColumn($pdo);
+        $result = password_change_finalize($pdo, $uid, $pk);
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -358,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        authApplyLoginSession($user);
+        authApplyLoginSession($pdo, $user);
 
         header('Content-Type: application/json');
         echo json_encode(['ok' => true]);
@@ -467,6 +630,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $userModel->ensureReferralCode($newUserId);
             if ($referralCode !== '') {
                 $userModel->attachReferralByCode($newUserId, $referralCode);
+            }
+
+            try {
+                user_notification_send_welcome($pdo, $newUserId, $prenom);
+            } catch (Throwable $e) {
+                // Inscription OK même si la notification échoue
             }
 
             $_SESSION['success'] = 'Compte créé avec succès !';

@@ -1,16 +1,48 @@
-﻿<?php
+<?php
+
+declare(strict_types=1);
+
+$foCatalogInline = defined('FO_CATALOG_INLINE') && FO_CATALOG_INLINE;
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$loggedIn = !empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+$userRole = $loggedIn ? strtolower(trim((string) ($_SESSION['user_role'] ?? ''))) : '';
+
+if (!$loggedIn || $userRole !== 'fournisseur') {
+    header('Location: List-Produit.php');
+    exit;
+}
+
+$idFournisseur = (int) ($_SESSION['user_id'] ?? 0);
+if ($idFournisseur < 1) {
+    header('Location: List-Produit.php');
+    exit;
+}
+
+if (!$foCatalogInline && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $editId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+    if ($editId < 1) {
+        header('Location: List-Produit-Fournisseur.php');
+        exit;
+    }
+    require_once __DIR__ . '/includes/fo_inline_crud.php';
+    header('Location: ' . fo_inline_crud_list_url('List-Produit-Fournisseur.php', 'edit', $editId, fo_inline_preserve_list_query()));
+    exit;
+}
+
 include __DIR__ . '/../Controllers/ProduitController.php';
 include __DIR__ . '/../Controllers/CategorieController.php';
 require_once __DIR__ . '/../Models/Produit.php';
 require_once __DIR__ . '/../Models/Categorie.php';
 
-$error = "";
+$error = '';
 
 $produitController = new ProduitController();
 $categorieController = new CategorieController();
 $categories = $categorieController->listCategories();
-
-$idFournisseur = 2; // temporaire
 
 $listeAllergenes = [
     'Gluten',
@@ -32,18 +64,21 @@ $listeBenefices = [
     'Protéines'
 ];
 
-// Vérification de l'id
-if (!isset($_GET['id']) || empty($_GET['id'])) {
-    die("ID du produit manquant.");
+$id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
+if ($id < 1) {
+    header('Location: List-Produit-Fournisseur.php');
+    exit;
+}
+if ($id < 1) {
+    header('Location: List-Produit-Fournisseur.php');
+    exit;
 }
 
-$id = (int) $_GET['id'];
-
-// On récupère uniquement un produit appartenant au fournisseur
 $produitData = $produitController->getProduitByIdAndUtilisateur($id, $idFournisseur);
 
 if (!$produitData) {
-    die("Produit introuvable ou accès refusé.");
+    header('Location: List-Produit-Fournisseur.php');
+    exit;
 }
 
 // Préremplissage
@@ -174,37 +209,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $produitController->updateProduitByUtilisateur($produit, $id, $idFournisseur);
 
-        header('Location: List-Produit-Fournisseur.php');
-        exit;
+        require_once __DIR__ . '/includes/fo_inline_crud.php';
+        fo_catalog_save_redirect('List-Produit-Fournisseur.php', array_merge(fo_inline_preserve_list_query(), ['notice' => 'product_updated']));
     }
 }
+
+require_once __DIR__ . '/includes/fo_inline_crud.php';
+$foListCloseUrl = fo_inline_crud_list_url('List-Produit-Fournisseur.php', '', 0, fo_inline_preserve_list_query());
 ?>
-
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Modifier mon produit</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link rel="stylesheet" type="text/css" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="/Views/assets/css/style.css">
-
-    <style>
-        .image-preview {
-            max-width: 140px;
-            max-height: 140px;
-            border-radius: 12px;
-            margin-top: 10px;
-            border: 1px solid #ddd;
-            object-fit: cover;
-            display: block;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container mt-5 mb-5">
+<div class="fo-catalog-inline-form">
+<div class="container mt-3 mb-3">
     <div class="row justify-content-center">
         <div class="col-lg-8">
 
@@ -214,13 +228,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="card-body">
-                    <?php if (!empty($error)) { ?>
-                        <div class="alert alert-danger">
-                            <?php echo $error; ?>
-                        </div>
-                    <?php } ?>
-
                     <form method="POST" action="" enctype="multipart/form-data">
+                        <input type="hidden" name="fo" value="edit">
+                        <input type="hidden" name="id" value="<?php echo (int) $id; ?>">
                         <div class="mb-3">
                             <label for="nom" class="form-label">Nom du produit</label>
                             <input
@@ -338,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="List-Produit-Fournisseur.php" class="btn btn-secondary">Retour</a>
+                            <a href="<?php echo htmlspecialchars($foListCloseUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-secondary">Retour</a>
                             <button type="submit" class="btn btn-warning">Modifier</button>
                         </div>
                     </form>
@@ -349,28 +359,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 </div>
 
-<script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
+</div>
+<style>
+.fo-catalog-inline-form .image-preview {
+    max-width: 140px;
+    max-height: 140px;
+    border-radius: 12px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    object-fit: cover;
+    display: block;
+}
+</style>
 <script>
-document.getElementById('image').addEventListener('change', function(event) {
-    const file = event.target.files[0];
-    const preview = document.getElementById('imagePreview');
-
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    }
-});
+(function () {
+    var input = document.getElementById('image');
+    var preview = document.getElementById('imagePreview');
+    if (!input || !preview) return;
+    input.addEventListener('change', function (event) {
+        var file = event.target.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+})();
 </script>
-
-<footer class="text-center py-3 mt-3 border-top small text-muted" style="font-family: Poppins, sans-serif;">
-    © 2026 HappyBite
-</footer>
-
-</body>
-</html>
+<?php
+require_once __DIR__ . '/includes/hb_action_toast.php';
+hb_action_toast_script(!empty($error) ? (string) $error : null, 5000);
+?>
 

@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../Controllers/AiAssistantContext.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -18,18 +24,8 @@ if (!is_array($payload)) {
 $questionRaw = trim((string) ($payload['question'] ?? ''));
 $page = strtolower(trim((string) ($payload['page'] ?? '')));
 
-if ($questionRaw === '') {
-    echo json_encode(['answer' => 'Veuillez ecrire une question.']);
-    exit;
-}
-
-$normalize = static function (string $text): string {
-    $text = mb_strtolower(trim($text), 'UTF-8');
-    $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text) ?: $text;
-    $text = preg_replace('/[^\pL\pN\s]/u', ' ', $text) ?? $text;
-    $text = preg_replace('/\s+/', ' ', $text) ?? $text;
-    return trim($text);
-};
+$questionNorm = ai_assistant_normalize_question($questionRaw);
+$detectedLang = ai_assistant_detect_language($questionRaw);
 
 $containsOneOf = static function (string $normalizedText, array $needles): bool {
     foreach ($needles as $needle) {
@@ -52,82 +48,118 @@ $containsAll = static function (string $normalizedText, array $needles): bool {
     return true;
 };
 
-$detectLanguage = static function (string $normalizedText): string {
-    $englishSignals = [
-        'where', 'order', 'track', 'shipping', 'delivery', 'arrive', 'cancel',
-        'payment', 'paypal', 'card', 'cash', 'secure', 'help', 'my', 'i',
-        'what', 'about', 'thanks', 'thank you', 'bye', 'goodbye',
-    ];
-    $frenchSignals = [
-        'ou', 'commande', 'suivi', 'livraison', 'arrivera', 'annuler',
-        'paiement', 'carte', 'cash', 'securise', 'aide', 'ma', 'mon',
-        'merci', 'au revoir', 'salut',
-    ];
-    $enScore = 0;
-    $frScore = 0;
-    foreach ($englishSignals as $word) {
-        if (preg_match('/\b' . preg_quote($word, '/') . '\b/u', $normalizedText)) {
-            $enScore++;
-        }
+$preferredLang = strtolower(trim((string) ($payload['preferred_lang'] ?? '')));
+if (!in_array($preferredLang, ['en', 'fr'], true)) {
+    $preferredLang = '';
+}
+
+$lang = $preferredLang !== '' ? $preferredLang : $detectedLang;
+
+$appendLangHint = static function (string $answer) use ($detectedLang, $preferredLang, $lang, $questionRaw): string {
+    if ($preferredLang === '' || $detectedLang === $preferredLang) {
+        return $answer;
     }
-    foreach ($frenchSignals as $word) {
-        if (preg_match('/\b' . preg_quote($word, '/') . '\b/u', $normalizedText)) {
-            $frScore++;
-        }
+    if (!ai_assistant_lang_detection_confident($questionRaw)) {
+        return $answer;
     }
-    return $enScore > $frScore ? 'en' : 'fr';
+    $note = ai_assistant_lang_mismatch_note($detectedLang, $preferredLang, $lang);
+
+    return $note !== '' ? $answer . "\n\n" . $note : $answer;
 };
 
-$questionNorm = $normalize($questionRaw);
-$lang = $detectLanguage($questionNorm);
+$aiChatRespond = static function (array $payload, string $lang) use ($appendLangHint, $detectedLang): void {
+    $payload['lang'] = $lang;
+    $payload['detected_lang'] = $detectedLang;
+    if (isset($payload['answer']) && is_string($payload['answer'])) {
+        $payload['answer'] = $appendLangHint($payload['answer']);
+    }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit;
+};
 
-// API badword (local moderation layer).
+if ($questionRaw === '') {
+    $aiChatRespond(['answer' => 'Veuillez ecrire une question.'], 'fr');
+}
+
+// API badword (local moderation layer) — whole words only (évite "con" dans "commande").
 $badWords = [
-    'con', 'connard', 'idiot', 'imbecile', 'pute', 'merde', 'salope', 'encule',
+    'connard', 'idiot', 'imbecile', 'pute', 'merde', 'salope', 'encule',
     'fuck', 'shit', 'bitch', 'asshole',
 ];
-if ($containsOneOf($questionNorm, $badWords)) {
-    echo json_encode([
-        'answer' => $lang === 'en'
-            ? 'Please keep it respectful. Rephrase your question without offensive language.'
-            : 'Merci de rester respectueux. Reformulez votre question sans termes offensants.'
-    ]);
-    exit;
+$hasBadWord = static function (string $normalizedText, array $words): bool {
+    foreach ($words as $word) {
+        if ($word !== '' && preg_match('/\b' . preg_quote($word, '/') . '\b/u', $normalizedText)) {
+            return true;
+        }
+    }
+    return false;
+};
+if ($hasBadWord($questionNorm, $badWords) || preg_match('/\bcon\b/u', $questionNorm)) {
+    $aiChatRespond([
+        'answer' => match ($lang) {
+            'en' => 'Please keep it respectful. Rephrase your question without offensive language.',
+            default => 'Merci de rester respectueux. Reformulez votre question sans termes offensants.',
+        },
+    ], $lang);
 }
 
 // Business priority rule requested by teacher/user: tracking link.
-$isTrackingIntent = $containsOneOf($questionNorm, [
-    'ou est ma commande',
-    'quand ma commande arrivera',
-    'suivre ma commande',
-    'ou en est ma commande',
-    'where is my order',
-    'where s my order',
-    'when will my order arrive',
-    'track my order',
-    'order status',
-]) || (
-    $containsOneOf($questionNorm, ['commande', 'order']) &&
-    $containsOneOf($questionNorm, ['ou', 'where', 'suivre', 'track', 'status', 'arrive', 'arrivera'])
-);
+if (ai_assistant_is_tracking_intent($questionNorm, $questionRaw)) {
+    $aiChatRespond(ai_assistant_build_tracking_response($lang, $page), $lang);
+}
 
-if ($isTrackingIntent) {
-    $answer = $lang === 'en'
-        ? ($page !== 'commande.php'
-            ? 'Here is your order tracking link:'
-            : 'Please complete your order first, then use this tracking link:')
-        : ($page !== 'commande.php'
-            ? 'Voici le lien de suivi de votre commande :'
-            : 'Finalisez d abord votre commande, puis utilisez ce lien :');
-    $linkLabel = $lang === 'en' ? 'Track my order' : 'Suivre ma commande';
-    echo json_encode([
-        'answer' => $answer,
-        'link' => [
-            'url' => 'track.php',
-            'label' => $linkLabel
-        ],
-    ]);
-    exit;
+if (ai_assistant_is_out_of_scope($questionNorm, $questionRaw)) {
+    $aiChatRespond(['answer' => ai_assistant_msg($lang, 'not_programmed')], $lang);
+}
+
+// FAQ paiement / commande (avant catalogue et OpenAI).
+$faqAnswer = ai_assistant_try_faq_answer($questionRaw, $questionNorm, $lang, $containsOneOf);
+if (is_string($faqAnswer) && $faqAnswer !== '') {
+    $aiChatRespond(['answer' => $faqAnswer], $lang);
+}
+
+// Catalogue / recettes / frigo : reponses basees sur la base de donnees (+ OpenAI si cle configuree).
+$userId = !empty($_SESSION['logged_in']) ? (int) ($_SESSION['user_id'] ?? 0) : 0;
+try {
+    $pdo = Database::getConnection();
+    $dbContext = ai_assistant_build_context($pdo, $userId);
+    $dbAnswer = ai_assistant_try_database_answer(
+        $questionRaw,
+        $questionNorm,
+        $lang,
+        $dbContext,
+        $containsOneOf,
+        $containsAll
+    );
+    if (is_string($dbAnswer) && $dbAnswer !== '') {
+        $aiChatRespond(['answer' => $dbAnswer], $lang);
+    }
+} catch (Throwable $e) {
+    // Continue vers reponse locale catalogue / fallbacks deterministes.
+}
+
+// Second chance : reponse catalogue sans OpenAI (si connexion DB indisponible plus haut).
+if (
+    !ai_assistant_is_out_of_scope($questionNorm, $questionRaw)
+    && ai_assistant_is_catalog_question($questionNorm, $containsOneOf)
+) {
+    try {
+        $pdo = Database::getConnection();
+        $dbContext = ai_assistant_build_context($pdo, $userId);
+        $localOnly = ai_assistant_answer_locally(
+            $questionRaw,
+            $questionNorm,
+            $lang,
+            $dbContext,
+            $containsOneOf,
+            $containsAll
+        );
+        if (is_string($localOnly) && $localOnly !== '') {
+            $aiChatRespond(['answer' => $localOnly], $lang);
+        }
+    } catch (Throwable $e) {
+        // fallthrough
+    }
 }
 
 // API externe / API chat / H.Face (Hugging Face Inference API).
@@ -136,9 +168,7 @@ $hfModel = getenv('HF_MODEL') ?: 'google/flan-t5-base';
 $externalAnswer = null;
 
 if (is_string($hfApiKey) && trim($hfApiKey) !== '') {
-    $langInstruction = $lang === 'en'
-        ? 'Reply in English only, concise and helpful.'
-        : 'Reponds en francais uniquement, de maniere breve et utile.';
+    $langInstruction = ai_assistant_language_instruction($lang, $questionRaw);
     $prompt = "You are the HappyBite assistant. " . $langInstruction . "\nUser question: " . $questionRaw;
     $url = 'https://api-inference.huggingface.co/models/' . rawurlencode($hfModel);
     $requestBody = json_encode([
@@ -181,9 +211,12 @@ if (is_string($hfApiKey) && trim($hfApiKey) !== '') {
     }
 }
 
-if (is_string($externalAnswer) && $externalAnswer !== '') {
-    echo json_encode(['answer' => $externalAnswer], JSON_UNESCAPED_UNICODE);
-    exit;
+if (
+    is_string($externalAnswer) && $externalAnswer !== ''
+    && !ai_assistant_is_out_of_scope($questionNorm, $questionRaw)
+    && !ai_assistant_is_catalog_question($questionNorm, $containsOneOf)
+) {
+    $aiChatRespond(['answer' => $externalAnswer], ai_assistant_detect_language($externalAnswer) ?: $lang);
 }
 
 // Deterministic fallback replies if external API unavailable.
@@ -196,23 +229,13 @@ if (
     ($containsOneOf($questionNorm, ['paypal', 'payment', 'paiement', 'card', 'carte']) &&
         $containsOneOf($questionNorm, ['secure', 'securise']))
 ) {
-    echo json_encode([
-        'answer' => $lang === 'en'
-            ? 'Yes, payment is secure on HappyBite.'
-            : 'Oui, le paiement est securise sur HappyBite.'
-    ]);
-    exit;
+    $aiChatRespond(['answer' => ai_assistant_msg($lang, 'payment_secure')], $lang);
 }
 if (
     $containsOneOf($questionNorm, ['annuler ma commande', 'possible d annuler', 'cancel my order', 'can i cancel my order']) ||
     ($containsOneOf($questionNorm, ['annuler', 'cancel']) && $containsOneOf($questionNorm, ['commande', 'order']))
 ) {
-    echo json_encode([
-        'answer' => $lang === 'en'
-            ? 'Yes, you can cancel an order as long as it has not been shipped.'
-            : 'Oui, vous pouvez annuler une commande tant qu elle n est pas expediee.'
-    ]);
-    exit;
+    $aiChatRespond(['answer' => ai_assistant_msg($lang, 'cancel_order')], $lang);
 }
 if (
     $containsOneOf($questionNorm, [
@@ -224,63 +247,60 @@ if (
         $containsOneOf($questionNorm, ['mode', 'method', 'paiement', 'payment', 'choose', 'choisir'])
     )
 ) {
-    echo json_encode([
-        'answer' => $lang === 'en'
-            ? 'You can choose Card, Cash, or PayPal depending on your preference.'
-            : 'Vous pouvez choisir Carte, Cash ou PayPal selon votre preference.'
-    ]);
-    exit;
+    $aiChatRespond(['answer' => ai_assistant_msg($lang, 'payment_methods')], $lang);
 }
 
-echo json_encode([
-    'answer' => (function () use ($questionNorm, $lang, $containsOneOf, $containsAll): string {
-        if ($containsOneOf($questionNorm, ['thanks', 'thank you', 'thx', 'merci'])) {
-            return $lang === 'en'
-                ? 'You are welcome. If you want, I can also help you with products, recipes, or tracking your order.'
-                : 'Avec plaisir. Je peux aussi vous aider pour les produits, les recettes ou le suivi de commande.';
+$aiChatRespond([
+    'answer' => (function () use ($questionNorm, $questionRaw, $lang, $userId, $containsOneOf, $containsAll): string {
+        if (ai_assistant_is_out_of_scope($questionNorm, $questionRaw)) {
+            return ai_assistant_msg($lang, 'not_programmed');
         }
-        if ($containsOneOf($questionNorm, ['bye', 'goodbye', 'see you', 'au revoir', 'a bientot'])) {
-            return $lang === 'en'
-                ? 'Goodbye! Have a great day. I am here if you need help later.'
-                : 'Au revoir ! Bonne journee. Je suis la si vous avez besoin d aide plus tard.';
+        if ($containsOneOf($questionNorm, ['thanks', 'thank you', 'thx', 'merci', 'danke', 'شكر'])) {
+            return ai_assistant_msg($lang, 'thanks');
         }
-        if ($containsOneOf($questionNorm, ['recette', 'recettes', 'recipe', 'recipes', 'plat', 'meal'])) {
-            return $lang === 'en'
-                ? 'You can explore the recipes section, open details, and filter to find meals that match your needs.'
-                : 'Vous pouvez explorer la section recettes, ouvrir les details et filtrer pour trouver des plats adaptes.';
+        if ($containsOneOf($questionNorm, ['bye', 'goodbye', 'see you', 'au revoir', 'a bientot', 'tschuss', 'wiedersehen'])) {
+            return ai_assistant_msg($lang, 'bye');
+        }
+        if (ai_assistant_is_catalog_question($questionNorm, $containsOneOf)) {
+            try {
+                $pdo = Database::getConnection();
+                $dbContext = ai_assistant_build_context($pdo, $userId);
+                $localAnswer = ai_assistant_answer_locally(
+                    $questionRaw,
+                    $questionNorm,
+                    $lang,
+                    $dbContext,
+                    $containsOneOf,
+                    $containsAll
+                );
+                if (is_string($localAnswer) && $localAnswer !== '') {
+                    return $localAnswer;
+                }
+            } catch (Throwable $e) {
+                // fallthrough
+            }
+        }
+        if ($containsOneOf($questionNorm, ['recette', 'recettes', 'recipe', 'recipes', 'plat', 'meal', 'rezept'])) {
+            return ai_assistant_msg($lang, 'hint_recipes');
         }
         if ($containsOneOf($questionNorm, ['produit', 'produits', 'product', 'products', 'categorie', 'category', 'categories'])) {
-            return $lang === 'en'
-                ? 'You can browse products by category, check details, and compare prices or promotions.'
-                : 'Vous pouvez parcourir les produits par categorie, voir les details et comparer les prix ou promotions.';
+            return ai_assistant_msg($lang, 'hint_products');
         }
-        if ($containsOneOf($questionNorm, ['frigo', 'refrigerateur', 'refrigerator', 'fridge'])) {
-            return $lang === 'en'
-                ? 'You can add items to your Frigo and review them from the Frigo page to manage what you already have.'
-                : 'Vous pouvez ajouter des elements au Frigo puis les consulter depuis la page Frigo pour gerer ce que vous avez deja.';
+        if ($containsOneOf($questionNorm, ['frigo', 'refrigerateur', 'refrigerator', 'fridge', 'kuhlschrank'])) {
+            return ai_assistant_msg($lang, 'hint_frigo');
         }
         if ($containsOneOf($questionNorm, ['allerg', 'allergen', 'allergene', 'allergenes', 'calorie', 'calories', 'sante', 'health'])) {
-            return $lang === 'en'
-                ? 'Check product/recipe details for allergens, calories, and health indicators before choosing.'
-                : 'Consultez les details des produits/recettes pour les allergenes, calories et indicateurs sante avant de choisir.';
+            return ai_assistant_msg($lang, 'hint_health');
         }
-        if ($containsOneOf($questionNorm, ['promo', 'promotion', 'discount', 'cheap', 'moins cher', 'budget'])) {
-            return $lang === 'en'
-                ? 'You can search promoted products and compare prices directly from the product list.'
-                : 'Vous pouvez rechercher les produits en promotion et comparer les prix directement dans la liste produits.';
+        if ($containsOneOf($questionNorm, ['promo', 'promotion', 'discount', 'cheap', 'moins cher', 'budget', 'gunstig'])) {
+            return ai_assistant_msg($lang, 'hint_promo');
         }
-        if ($containsOneOf($questionNorm, ['bonjour', 'salut', 'hello', 'hi', 'hey'])) {
-            return $lang === 'en'
-                ? 'Hi! I can help with products, recipes, Frigo, payments, delivery, and order tracking.'
-                : 'Bonjour ! Je peux vous aider pour les produits, recettes, frigo, paiement, livraison et suivi de commande.';
+        if ($containsOneOf($questionNorm, ['bonjour', 'salut', 'hello', 'hi', 'hey', 'hallo'])) {
+            return ai_assistant_msg($lang, 'hello');
         }
         if ($containsAll($questionNorm, ['comment', 'utiliser']) || $containsOneOf($questionNorm, ['how to use', 'how does it work', 'guide'])) {
-            return $lang === 'en'
-                ? 'Quick guide: choose products/recipes, add to panier, validate commande, then follow delivery from track.'
-                : 'Guide rapide : choisissez produits/recettes, ajoutez au panier, validez la commande puis suivez la livraison via track.';
+            return ai_assistant_msg($lang, 'hint_guide');
         }
-        return $lang === 'en'
-            ? 'I do not understand that question. I am programmed to answer about products, recipes, frigo, orders, delivery, payments, and tracking.'
-            : 'Je ne comprends pas cette question. Je suis programme pour repondre sur les produits, recettes, frigo, commande, livraison, paiement et suivi.';
-    })()
-], JSON_UNESCAPED_UNICODE);
+        return ai_assistant_msg($lang, 'unknown');
+    })(),
+], $lang);

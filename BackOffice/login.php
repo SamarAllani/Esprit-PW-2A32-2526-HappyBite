@@ -18,6 +18,7 @@ unset($_SESSION['bo_login_error']);
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyBite — Connexion administrateur</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +42,16 @@ unset($_SESSION['bo_login_error']);
         <div class="auth-card">
             <h2 class="auth-card__title">Connexion Back-office</h2>
 
+            <details class="auth-demo-guide" open>
+                <summary class="auth-demo-guide__title">Guide démo — compte administrateur</summary>
+                <p class="auth-demo-guide__intro">Compte fictif pour la démonstration ESPRIT.</p>
+                <ul class="auth-demo-guide__list">
+                    <li><strong>Administrateur</strong> — <code>admin@happybite.tn</code></li>
+                </ul>
+                <p class="auth-demo-guide__pwd">Mot de passe : <strong>password</strong></p>
+                <p class="auth-demo-guide__warn">Le changement de mot de passe depuis le profil envoie un vrai e-mail de confirmation. Utilisez une adresse Gmail réelle et accessible.</p>
+            </details>
+
             <?php if ($error !== ''): ?>
                 <div class="auth-alert auth-alert--error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
@@ -63,5 +74,6 @@ unset($_SESSION['bo_login_error']);
         </div>
     </main>
 </div>
+<?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_footer(); ?>
 </body>
 </html>

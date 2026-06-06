@@ -241,8 +241,6 @@ try {
 } catch (Throwable) {
 }
 
-$notifCount = min(99, $commandePending + $livraisonsDelayed);
-
 /** @return array{class: string, label: string} */
 $commandeBadge = static function (array $c): array {
     $mode = trim((string) ($c['modePaiement'] ?? ''));
@@ -265,6 +263,8 @@ if ($cmdCtrl === null) {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyBite — Tableau de bord</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -295,35 +295,6 @@ if ($cmdCtrl === null) {
             object-fit: cover;
             border: 2px solid #d8e8dc;
             background: #f0fdf4;
-        }
-        .page-bo-home .bo-home-notif {
-            position: relative;
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.15rem;
-            cursor: default;
-        }
-        .page-bo-home .bo-home-notif span {
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 18px;
-            height: 18px;
-            padding: 0 5px;
-            border-radius: 999px;
-            background: #f97316;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         .page-bo-home .bo-home-summary {
             background: #fffbeb;
@@ -425,12 +396,6 @@ bo_layout_start('');
                 <div class="bo-home-time">
                     <span><?php echo htmlspecialchars($now->format('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?></span>
                     <strong><?php echo htmlspecialchars($now->format('H:i'), ENT_QUOTES, 'UTF-8'); ?></strong>
-                </div>
-                <div class="bo-home-notif" title="Notifications (synthèse)" aria-hidden="true">
-                    🔔
-                    <?php if ($notifCount > 0) { ?>
-                        <span><?php echo (int) $notifCount; ?></span>
-                    <?php } ?>
                 </div>
                 <img class="bo-home-avatar" src="<?php echo htmlspecialchars($profileImgSrc, ENT_QUOTES, 'UTF-8'); ?>" width="44" height="44" alt="">
             </div>

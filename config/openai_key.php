@@ -73,3 +73,35 @@ function hb_openai_api_key(): string
 
     return '';
 }
+
+function hb_gemini_api_key(): string
+{
+    $trim = static function ($v): string {
+        return is_string($v) ? trim($v) : '';
+    };
+
+    $v = $trim(getenv('GEMINI_API_KEY') ?: '');
+    if ($v !== '') {
+        return $v;
+    }
+    if (isset($_ENV['GEMINI_API_KEY'])) {
+        $v = $trim((string) $_ENV['GEMINI_API_KEY']);
+        if ($v !== '') {
+            return $v;
+        }
+    }
+    if (isset($_SERVER['GEMINI_API_KEY'])) {
+        $v = $trim((string) $_SERVER['GEMINI_API_KEY']);
+        if ($v !== '') {
+            return $v;
+        }
+    }
+    if (defined('GEMINI_API_KEY')) {
+        $v = $trim((string) constant('GEMINI_API_KEY'));
+        if ($v !== '' && $v !== 'collez-votre-cle-gemini-ici') {
+            return $v;
+        }
+    }
+
+    return '';
+}

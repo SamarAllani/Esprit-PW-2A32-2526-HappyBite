@@ -6,12 +6,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/fo_i18n.php';
+fo_init_i18n_for_request();
+
 if (!empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     return;
 }
 
 ?>
 <style>
+.hb-guest-gate--hidden {
+    display: none !important;
+}
 .hb-guest-gate {
     position: fixed;
     inset: 0;
@@ -91,15 +97,18 @@ if (!empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     background: #f0faf4;
 }
 </style>
-<div class="hb-guest-gate" role="dialog" aria-modal="true" aria-labelledby="hb-guest-gate-title">
+<?php
+$foGuestGateHidden = !empty($foGuestGateHidden);
+?>
+<div class="hb-guest-gate<?php echo $foGuestGateHidden ? ' hb-guest-gate--hidden' : ''; ?>" role="dialog" aria-modal="true" aria-labelledby="hb-guest-gate-title">
     <div class="hb-guest-gate__panel">
-        <h2 id="hb-guest-gate-title" class="hb-guest-gate__title">Connexion requise</h2>
+        <h2 id="hb-guest-gate-title" class="hb-guest-gate__title"><?php echo fo_e('guest.title'); ?></h2>
         <p class="hb-guest-gate__text">
-            Connectez-vous ou créez un compte pour accéder à cette partie du site et continuer.
+            <?php echo fo_e('guest.text'); ?>
         </p>
         <div class="hb-guest-gate__actions">
-            <a class="hb-guest-gate__btn hb-guest-gate__btn--login" href="auth/login.php">Se connecter</a>
-            <a class="hb-guest-gate__btn hb-guest-gate__btn--signup" href="auth/register.php">S'inscrire</a>
+            <a class="hb-guest-gate__btn hb-guest-gate__btn--login" href="auth/login.php"><?php echo fo_e('nav.login'); ?></a>
+            <a class="hb-guest-gate__btn hb-guest-gate__btn--signup" href="auth/register.php"><?php echo fo_e('nav.signup'); ?></a>
         </div>
     </div>
 </div>

@@ -1,5 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../Controllers/ProduitController.php';
 require_once __DIR__ . '/../Controllers/RecetteController.php';
@@ -29,11 +36,11 @@ try {
  * Titres courts pour les cartes (contenu des avis depuis data.txt / feedback_home.txt).
  */
 $homeFeedbackTitles = [
-    2 => 'Communauté & motivation',
-    3 => 'Tout personnalisé',
-    4 => 'Un outil du quotidien',
-    5 => 'Suivi ultra complet',
-    6 => 'Objectifs sur mesure',
+    2 => fo_t('home.feedback.t2'),
+    3 => fo_t('home.feedback.t3'),
+    4 => fo_t('home.feedback.t4'),
+    5 => fo_t('home.feedback.t5'),
+    6 => fo_t('home.feedback.t6'),
 ];
 
 /**
@@ -182,9 +189,11 @@ try {
 }
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
     <title>HappyBite — Accueil</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,11 +215,11 @@ require __DIR__ . '/includes/nav_front.php';
             <img class="home-hero-slide" src="images/pic2.png" alt="Eat healthy - image 2" loading="lazy">
             <img class="home-hero-slide" src="images/pic3.webp" alt="Eat healthy - image 3" loading="lazy">
             <div class="home-hero-overlay">
-                <h1>Mangez sain.<br>Vivez mieux.</h1>
-                <p>Découvrez des repas équilibrés, des produits frais et une meilleure routine avec HappyBite.</p>
+                <h1><?php echo fo_t('home.hero.title'); ?></h1>
+                <p><?php echo fo_e('home.hero.sub'); ?></p>
                 <div class="home-hero-cta">
-                    <a class="home-hero-btn home-hero-btn--primary" href="List-Produit.php">Explorer les produits</a>
-                    <a class="home-hero-btn home-hero-btn--ghost" href="List-Recette.php">Voir les recettes</a>
+                    <a class="home-hero-btn home-hero-btn--primary" href="List-Produit.php"><?php echo fo_e('home.hero.products'); ?></a>
+                    <a class="home-hero-btn home-hero-btn--ghost" href="List-Recette.php"><?php echo fo_e('home.hero.recipes'); ?></a>
                 </div>
             </div>
         </section>
@@ -224,10 +233,10 @@ require __DIR__ . '/includes/nav_front.php';
                             <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                         </svg>
                     </span>
-                    <h2>Produits sains</h2>
+                    <h2><?php echo fo_e('home.feature.products'); ?></h2>
                 </div>
-                <p>Achetez des produits nutritifs adaptés à votre style de vie.</p>
-                <a href="List-Produit.php" class="home-feature-link">Découvrir <span aria-hidden="true">→</span></a>
+                <p><?php echo fo_e('home.feature.products_desc'); ?></p>
+                <a href="List-Produit.php" class="home-feature-link"><?php echo fo_e('home.discover'); ?> <span aria-hidden="true">→</span></a>
             </article>
             <article class="home-feature-card home-feature-card--recipes">
                 <div class="home-feature-head">
@@ -239,10 +248,10 @@ require __DIR__ . '/includes/nav_front.php';
                             <path d="M6 11v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-8"/>
                         </svg>
                     </span>
-                    <h2>Recettes</h2>
+                    <h2><?php echo fo_e('home.feature.recipes'); ?></h2>
                 </div>
-                <p>Apprenez à cuisiner équilibré à la maison, simplement.</p>
-                <a href="List-Recette.php" class="home-feature-link">Parcourir <span aria-hidden="true">→</span></a>
+                <p><?php echo fo_e('home.feature.recipes_desc'); ?></p>
+                <a href="List-Recette.php" class="home-feature-link"><?php echo fo_e('home.browse'); ?> <span aria-hidden="true">→</span></a>
             </article>
             <article class="home-feature-card home-feature-card--community">
                 <div class="home-feature-head">
@@ -251,10 +260,10 @@ require __DIR__ . '/includes/nav_front.php';
                             <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>
                         </svg>
                     </span>
-                    <h2>Communauté</h2>
+                    <h2><?php echo fo_e('home.feature.community'); ?></h2>
                 </div>
-                <p>Partagez vos plats et découvrez les publications des autres.</p>
-                <a href="Communaute.php" class="home-feature-link">Explorer <span aria-hidden="true">→</span></a>
+                <p><?php echo fo_e('home.feature.community_desc'); ?></p>
+                <a href="Communaute.php" class="home-feature-link"><?php echo fo_e('home.explore'); ?> <span aria-hidden="true">→</span></a>
             </article>
             <article class="home-feature-card home-feature-card--tracker">
                 <div class="home-feature-head">
@@ -265,26 +274,26 @@ require __DIR__ . '/includes/nav_front.php';
                             <path d="M7 14l3-3 3 2 4-5"/>
                         </svg>
                     </span>
-                    <h2>Suivi santé</h2>
+                    <h2><?php echo fo_e('home.feature.health'); ?></h2>
                 </div>
-                <p>Suivez vos progrès au quotidien et améliorez vos objectifs.</p>
-                <a href="sante.php" class="home-feature-link">Commencer <span aria-hidden="true">→</span></a>
+                <p><?php echo fo_e('home.feature.health_desc'); ?></p>
+                <a href="sante.php" class="home-feature-link"><?php echo fo_e('home.start'); ?> <span aria-hidden="true">→</span></a>
             </article>
         </section>
 
-        <section class="home-section" aria-label="Produits en vedette">
+        <section class="home-section" aria-label="<?php echo fo_e('home.section.products_aria'); ?>">
             <div class="home-section-head">
-                <h2 class="home-section-title">Produits en vedette</h2>
-                <a class="home-section-more" href="List-Produit.php">Voir tout <span aria-hidden="true">→</span></a>
+                <h2 class="home-section-title"><?php echo fo_e('home.section.products'); ?></h2>
+                <a class="home-section-more" href="List-Produit.php"><?php echo fo_e('home.see_all'); ?> <span aria-hidden="true">→</span></a>
             </div>
             <div class="home-card-grid">
                 <?php if ($produitsFeatured === []) { ?>
                     <article class="home-media-card">
                         <div class="home-media-card__img home-media-card__img--p1" aria-hidden="true"></div>
                         <div class="home-media-card__body">
-                            <h3>Aucun produit disponible</h3>
-                            <p>Ajoutez des produits en base pour afficher cette section.</p>
-                            <a class="home-media-card__btn" href="List-Produit.php">Voir <span aria-hidden="true">→</span></a>
+                            <h3><?php echo fo_e('home.empty.products_title'); ?></h3>
+                            <p><?php echo fo_e('home.empty.products_desc'); ?></p>
+                            <a class="home-media-card__btn" href="List-Produit.php"><?php echo fo_e('home.view'); ?> <span aria-hidden="true">→</span></a>
                         </div>
                     </article>
                 <?php } else { ?>
@@ -293,18 +302,18 @@ require __DIR__ . '/includes/nav_front.php';
                         $idProduit = (int) ($produit['id_produit'] ?? 0);
                         $imgProduit = trim((string) ($produit['image'] ?? ''));
                         $prixProduit = (float) ($produit['prix'] ?? 0);
-                        $descProduit = trim((string) ($produit['benefices'] ?? 'Produit healthy disponible sur HappyBite.'));
+                        $descProduit = trim((string) ($produit['benefices'] ?? fo_t('home.product_desc_default')));
                         ?>
                         <article class="home-media-card">
                             <?php if ($imgProduit !== '') { ?>
-                                <div class="home-media-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgProduit); ?>" alt="<?php echo htmlspecialchars((string) ($produit['nom'] ?? 'Produit')); ?>"></div>
+                                <div class="home-media-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgProduit); ?>" alt="<?php echo htmlspecialchars((string) ($produit['nom'] ?? fo_t('home.product_default'))); ?>"></div>
                             <?php } else { ?>
                                 <div class="home-media-card__img home-media-card__img--p<?php echo ($idx % 4) + 1; ?>" aria-hidden="true"></div>
                             <?php } ?>
                             <div class="home-media-card__body">
-                                <h3><?php echo htmlspecialchars((string) ($produit['nom'] ?? 'Produit')); ?></h3>
-                                <p><?php echo htmlspecialchars(substr($descProduit, 0, 90)); ?><?php echo strlen($descProduit) > 90 ? '…' : ''; ?></p>
-                                <a class="home-media-card__btn" href="Detail-Produit.php?id=<?php echo $idProduit; ?>">Voir (<?php echo htmlspecialchars(number_format($prixProduit, 2, ',', ' ')); ?> DT) <span aria-hidden="true">→</span></a>
+                                <h3><?php echo fo_db_e((string) ($produit['nom'] ?? fo_t('home.product_default'))); ?></h3>
+                                <p><?php echo fo_db_e(substr($descProduit, 0, 90)); ?><?php echo strlen($descProduit) > 90 ? '…' : ''; ?></p>
+                                <a class="home-media-card__btn" href="Detail-Produit.php?id=<?php echo $idProduit; ?>"><?php echo fo_e('home.view'); ?> (<?php echo htmlspecialchars(number_format($prixProduit, 2, ',', ' ')); ?> DT) <span aria-hidden="true">→</span></a>
                             </div>
                         </article>
                     <?php } ?>
@@ -312,19 +321,19 @@ require __DIR__ . '/includes/nav_front.php';
             </div>
         </section>
 
-        <section class="home-section" aria-label="Recettes en vedette">
+        <section class="home-section" aria-label="<?php echo fo_e('home.section.recipes_aria'); ?>">
             <div class="home-section-head">
-                <h2 class="home-section-title">Recettes en vedette</h2>
-                <a class="home-section-more" href="List-Recette.php">Voir tout <span aria-hidden="true">→</span></a>
+                <h2 class="home-section-title"><?php echo fo_e('home.section.recipes'); ?></h2>
+                <a class="home-section-more" href="List-Recette.php"><?php echo fo_e('home.see_all'); ?> <span aria-hidden="true">→</span></a>
             </div>
             <div class="home-card-grid home-card-grid--recipes">
                 <?php if ($recettesFeatured === []) { ?>
                     <article class="home-media-card">
                         <div class="home-media-card__img home-media-card__img--r1" aria-hidden="true"></div>
                         <div class="home-media-card__body">
-                            <h3>Aucune recette disponible</h3>
-                            <p>Ajoutez des recettes en base pour afficher cette section.</p>
-                            <a class="home-media-card__btn" href="List-Recette.php">Voir <span aria-hidden="true">→</span></a>
+                            <h3><?php echo fo_e('home.empty.recipes_title'); ?></h3>
+                            <p><?php echo fo_e('home.empty.recipes_desc'); ?></p>
+                            <a class="home-media-card__btn" href="List-Recette.php"><?php echo fo_e('home.view'); ?> <span aria-hidden="true">→</span></a>
                         </div>
                     </article>
                 <?php } else { ?>
@@ -332,18 +341,18 @@ require __DIR__ . '/includes/nav_front.php';
                         <?php
                         $idRecette = (int) ($recette['id_recette'] ?? 0);
                         $imgRecette = trim((string) ($recette['image'] ?? ''));
-                        $descRecette = trim((string) ($recette['description'] ?? 'Recette healthy HappyBite.'));
+                        $descRecette = trim((string) ($recette['description'] ?? fo_t('home.recipe_desc_default')));
                         ?>
                         <article class="home-media-card">
                             <?php if ($imgRecette !== '') { ?>
-                                <div class="home-media-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgRecette); ?>" alt="<?php echo htmlspecialchars((string) ($recette['nom'] ?? 'Recette')); ?>"></div>
+                                <div class="home-media-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgRecette); ?>" alt="<?php echo htmlspecialchars((string) ($recette['nom'] ?? fo_t('home.recipe_default'))); ?>"></div>
                             <?php } else { ?>
                                 <div class="home-media-card__img home-media-card__img--r<?php echo ($idx % 3) + 1; ?>" aria-hidden="true"></div>
                             <?php } ?>
                             <div class="home-media-card__body">
-                                <h3><?php echo htmlspecialchars((string) ($recette['nom'] ?? 'Recette')); ?></h3>
-                                <p><?php echo htmlspecialchars(substr($descRecette, 0, 90)); ?><?php echo strlen($descRecette) > 90 ? '…' : ''; ?></p>
-                                <a class="home-media-card__btn" href="Detail-Recette.php?id=<?php echo $idRecette; ?>">Voir <span aria-hidden="true">→</span></a>
+                                <h3><?php echo fo_db_e((string) ($recette['nom'] ?? fo_t('home.recipe_default'))); ?></h3>
+                                <p><?php echo fo_db_e(substr($descRecette, 0, 90)); ?><?php echo strlen($descRecette) > 90 ? '…' : ''; ?></p>
+                                <a class="home-media-card__btn" href="Detail-Recette.php?id=<?php echo $idRecette; ?>"><?php echo fo_e('home.view'); ?> <span aria-hidden="true">→</span></a>
                             </div>
                         </article>
                     <?php } ?>
@@ -351,13 +360,13 @@ require __DIR__ . '/includes/nav_front.php';
             </div>
         </section>
 
-        <section class="home-section" aria-label="Communauté">
+        <section class="home-section" aria-label="<?php echo fo_e('home.section.community_aria'); ?>">
             <div class="home-section-head">
-                <h2 class="home-section-title">La communauté mange quoi ?</h2>
-                <a class="home-section-more" href="Communaute.php">Voir tout <span aria-hidden="true">→</span></a>
+                <h2 class="home-section-title"><?php echo fo_e('home.section.community'); ?></h2>
+                <a class="home-section-more" href="Communaute.php"><?php echo fo_e('home.see_all'); ?> <span aria-hidden="true">→</span></a>
             </div>
             <div class="home-community-strip">
-                <a class="home-community-card" href="Communaute.php" aria-label="Voir la communauté">
+                <a class="home-community-card" href="Communaute.php" aria-label="<?php echo fo_e('home.community_aria'); ?>">
                     <?php if ($postsFeatured === []) { ?>
                         <span class="home-community-card__img home-community-card__img--c1" aria-hidden="true"></span>
                         <span class="home-community-card__img home-community-card__img--c2" aria-hidden="true"></span>
@@ -367,7 +376,7 @@ require __DIR__ . '/includes/nav_front.php';
                         <?php foreach ($postsFeatured as $idx => $post) { ?>
                             <?php $imgPost = trim((string) ($post['image'] ?? '')); ?>
                             <?php if ($imgPost !== '') { ?>
-                                <span class="home-community-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgPost); ?>" alt="Post communautaire"></span>
+                                <span class="home-community-card__img"><img src="../uploads/<?php echo htmlspecialchars($imgPost); ?>" alt="<?php echo fo_e('home.community_post_alt'); ?>"></span>
                             <?php } else { ?>
                                 <span class="home-community-card__img home-community-card__img--c<?php echo ($idx % 4) + 1; ?>" aria-hidden="true"></span>
                             <?php } ?>
@@ -378,14 +387,14 @@ require __DIR__ . '/includes/nav_front.php';
         </section>
 
         <?php if (count($homeFeedbackItems) >= 2) { ?>
-        <section class="home-feedback" aria-label="Avis membres">
+        <section class="home-feedback" aria-label="<?php echo fo_e('home.feedback_aria'); ?>">
             <div class="home-feedback__inner">
                 <div class="home-feedback__intro">
-                    <p class="home-feedback__label">Feedback</p>
-                    <h2 class="home-feedback__title">Ce que nos membres disent.</h2>
-                    <div class="home-feedback__nav" role="group" aria-label="Navigation des avis">
-                        <button type="button" class="home-feedback__arrow" id="homeFeedbackPrev" aria-label="Avis précédent">&#8592;</button>
-                        <button type="button" class="home-feedback__arrow" id="homeFeedbackNext" aria-label="Avis suivant">&#8594;</button>
+                    <p class="home-feedback__label"><?php echo fo_e('home.feedback'); ?></p>
+                    <h2 class="home-feedback__title"><?php echo fo_e('home.feedback_title'); ?></h2>
+                    <div class="home-feedback__nav" role="group" aria-label="<?php echo fo_e('home.feedback_nav_aria'); ?>">
+                        <button type="button" class="home-feedback__arrow" id="homeFeedbackPrev" aria-label="<?php echo fo_e('home.feedback_prev'); ?>">&#8592;</button>
+                        <button type="button" class="home-feedback__arrow" id="homeFeedbackNext" aria-label="<?php echo fo_e('home.feedback_next'); ?>">&#8594;</button>
                     </div>
                 </div>
                 <div class="home-feedback__cards" id="homeFeedbackCards">
@@ -396,32 +405,41 @@ require __DIR__ . '/includes/nav_front.php';
         </section>
         <?php } ?>
 
-        <section class="home-bottom-slider" aria-label="Bannieres bas de page">
+        <section class="home-bottom-slider" aria-label="<?php echo fo_e('home.bottom_slider_aria'); ?>">
             <div class="home-bottom-slider__track" id="home-bottom-track">
                 <article class="home-bottom-slide">
-                    <img class="home-bottom-slide__bg" src="images/bottom1.png" alt="Suivi sante" onerror="this.onerror=null;this.src='images/bottom1.jpg';">
+                    <img class="home-bottom-slide__bg" src="images/bottom1.png" alt="<?php echo fo_e('home.slide1.alt'); ?>" onerror="this.onerror=null;this.src='images/bottom1.jpg';">
                     <div class="home-bottom-slide__content home-bottom-slide__content--right home-bottom-slide__content--dark">
-                        <h2>Suivez votre santé<br>Chaque jour</h2>
-                        <p>Surveillez vos habitudes, vos progrés et avancez vers vos objectifs avec régularité.</p>
-                        <a class="home-bottom-slide__btn" href="user_health_space.php">Commancer la suivi</a>
+                        <h2><?php echo fo_t('home.slide1.title'); ?></h2>
+                        <p><?php echo fo_e('home.slide1.desc'); ?></p>
+                        <a class="home-bottom-slide__btn" href="user_health_space.php"><?php echo fo_e('home.slide1.btn'); ?></a>
                     </div>
                 </article>
 
                 <article class="home-bottom-slide">
-                    <img class="home-bottom-slide__bg" src="images/bottom2.png" alt="Suivi commande" onerror="this.onerror=null;this.src='images/bottom2.jpg';">
+                    <img class="home-bottom-slide__bg" src="images/bottom2.png" alt="<?php echo fo_e('home.slide2.alt'); ?>" onerror="this.onerror=null;this.src='images/bottom2.jpg';">
                     <div class="home-bottom-slide__content home-bottom-slide__content--left home-bottom-slide__content--dark">
-                        <h2>Suivez votre commande</h2>
-                        <p>Vérifiez facilement le statut et l'avancement de votre commande en temps réel.</p>
-                        <a class="home-bottom-slide__btn" href="Track.php">Commancer la suivi</a>
+                        <h2><?php echo fo_e('home.slide2.title'); ?></h2>
+                        <p><?php echo fo_e('home.slide2.desc'); ?></p>
+                        <a class="home-bottom-slide__btn" href="Track.php"><?php echo fo_e('home.slide2.btn'); ?></a>
                     </div>
                 </article>
 
                 <article class="home-bottom-slide">
-                    <img class="home-bottom-slide__bg" src="images/bottom3.png" alt="Parcours sain" onerror="this.onerror=null;this.src='images/bottom3.jpg';">
+                    <img class="home-bottom-slide__bg" src="images/bottom4.png" alt="Challenge of the day" onerror="this.onerror=null;this.src='images/bottom4.jpg';">
+                    <div class="home-bottom-slide__content home-bottom-slide__content--left home-bottom-slide__content--dark">
+                        <h2><?php echo fo_t('home.challenge.title'); ?></h2>
+                        <p><?php echo fo_e('home.challenge.desc'); ?></p>
+                        <a class="home-bottom-slide__btn" href="challenge_du_jour.php"><?php echo fo_e('home.challenge.btn'); ?></a>
+                    </div>
+                </article>
+
+                <article class="home-bottom-slide">
+                    <img class="home-bottom-slide__bg" src="images/bottom3.png" alt="<?php echo fo_e('home.slide4.alt'); ?>" onerror="this.onerror=null;this.src='images/bottom3.jpg';">
                     <div class="home-bottom-slide__content home-bottom-slide__content--right">
-                        <h2>Commencez votre parcours sain dès aujourd'hui !</h2>
-                        <p>Mangez mieux, sentez-vous mieux, vivez mieux.</p>
-                        <a class="home-bottom-slide__btn" href="register.php">S'inscrire</a>
+                        <h2><?php echo fo_e('home.slide4.title'); ?></h2>
+                        <p><?php echo fo_e('home.slide4.desc'); ?></p>
+                        <a class="home-bottom-slide__btn" href="auth/register.php"><?php echo fo_e('home.slide4.btn'); ?></a>
                     </div>
                 </article>
             </div>
@@ -430,7 +448,7 @@ require __DIR__ . '/includes/nav_front.php';
 </main>
 
 <footer>
-    © 2026 HappyBite
+    <?php echo fo_e('footer.copyright'); ?>
 </footer>
 
 <script>

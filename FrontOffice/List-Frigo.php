@@ -1,7 +1,10 @@
-﻿<?php
+<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../Controllers/FrigoController.php';
 require_once __DIR__ . '/../Controllers/CategorieController.php';
@@ -52,7 +55,7 @@ if ($loggedIn && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $menuArray = json_decode($recetteIA, true);
         } else {
-            $recetteIA = 'Votre frigo est vide. Impossible de générer une recette.';
+            $recetteIA = fo_t('fridge.empty_cannot_generate');
         }
     } else {
         $action = $_POST['action'] ?? '';
@@ -85,10 +88,12 @@ $totalProduits = $loggedIn && $idUtilisateur > 0
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Mon Frigo</title>
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
+    <title><?php echo fo_e('fridge.title'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -102,18 +107,33 @@ html, body {
     padding: 0 !important;
 }
 
+.hb-ai-section,
 .chefbot-header {
     background: linear-gradient(135deg, #e8f8ef, #ffffff);
     border-radius: 24px;
     padding: 28px;
     margin-bottom: 25px;
-    border-left: 6px solid #20b978;
+    border-left: 6px solid #43a047;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-.chefbot-header h3 {
-    color: #13a66b;
+/* Titre ChefBot — même dégradé texte que « Demandez-moi » (Ai.php) */
+.chefbot-header-title {
+    margin-bottom: 12px;
+}
+
+.hb-gradient-title,
+.chefbot-header .chefbot-title {
+    margin: 0;
     font-weight: 700;
-    margin-bottom: 8px;
+    font-size: 1.55rem;
+    line-height: 1.25;
+    display: inline-block;
+    background: linear-gradient(90deg, #e53935 0%, #fb8c00 52%, #43a047 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
 }
 
 .chefbot-header p {
@@ -247,21 +267,21 @@ require __DIR__ . '/includes/nav_front.php';
 <div class="container py-5" id="frigo-zone">
 
     <div class="text-center mb-4">
-        <h2 class="fw-bold">Mon Frigo</h2>
-        <p class="text-muted">Retrouvez ici les produits ajoutés à votre frigo</p>
+        <h2 class="fw-bold"><?php echo fo_e('fridge.title'); ?></h2>
+        <p class="text-muted"><?php echo fo_e('fridge.subtitle'); ?></p>
     </div>
 
     <?php if ($loggedIn): ?>
     <div class="alert alert-success text-center shadow-sm mb-4">
-        <strong>Compte :</strong> utilisateur ID <?php echo (int) $idUtilisateur; ?><br>
-        <strong>Nombre d'articles distincts :</strong> <?php echo (int) $totalProduits; ?>
+        <strong><?php echo fo_e('fridge.account'); ?></strong> utilisateur ID <?php echo (int) $idUtilisateur; ?><br>
+        <strong><?php echo fo_e('fridge.items_count'); ?></strong> <?php echo (int) $totalProduits; ?>
     </div>
     <?php endif; ?>
 
     <form method="POST" class="text-center mb-4">
         <button type="submit" name="generer_recette_ia" class="frigo-ai-btn">
             <img src="images/recette.png" alt="" class="frigo-ai-btn-icon">
-            <span class="frigo-ai-btn-label">Générer une recette avec mon frigo</span>
+            <span class="frigo-ai-btn-label"><?php echo fo_e('fridge.generate_recipe'); ?></span>
         </button>
     </form>
 
@@ -269,12 +289,14 @@ require __DIR__ . '/includes/nav_front.php';
 
 <div class="chefbot-section mb-5">
 
-    <div class="chefbot-header shadow-sm">
-        <h3> ChefBot </h3>
-        <p>ChefBot a analysé votre frigo, votre profil santé et les produits les plus anciens pour limiter le gaspillage.</p>
+    <div class="chefbot-header hb-ai-section shadow-sm">
+        <div class="chefbot-header-title">
+            <h3 class="chefbot-title hb-gradient-title">ChefBot</h3>
+        </div>
+        <p><?php echo fo_e('fridge.chefbot_analyzed'); ?></p>
 
         <div class="chefbot-profile">
-            <span> Objectif : <?php echo htmlspecialchars($profilSante['objectif'] ?? 'non précisé'); ?></span>
+            <span><?php echo fo_e('fridge.objective'); ?> <?php echo fo_db_e((string) ($profilSante['objectif'] ?? fo_t('fridge.not_specified'))); ?></span>
             <span> Santé : <?php echo htmlspecialchars(($profilSante['maladies'] ?? 'aucune maladie') . ' | Allergènes : ' . ($profilSante['allergenes'] ?? 'aucun') . ' | Carences : ' . ($profilSante['carences'] ?? 'aucune')); ?></span>
         </div>
     </div>
@@ -284,33 +306,33 @@ require __DIR__ . '/includes/nav_front.php';
             <div class="chefbot-card shadow-sm">
 
                 <div class="chefbot-day">
-                    📅 <?php echo htmlspecialchars($jour['jour'] ?? 'Jour'); ?>
+                    📅 <?php echo fo_db_e((string) ($jour['jour'] ?? fo_t('fridge.day'))); ?>
                 </div>
 
-                <h4><?php echo htmlspecialchars($jour['titre'] ?? 'Recette'); ?></h4>
+                <h4><?php echo fo_db_e((string) ($jour['titre'] ?? fo_t('fridge.recipe'))); ?></h4>
 
                 <p class="priority">
-                     <strong>Produits prioritaires :</strong><br>
-                    <?php echo htmlspecialchars($jour['produits_prioritaires'] ?? 'non précisé'); ?>
+                     <strong><?php echo fo_e('fridge.priority_products'); ?></strong><br>
+                    <?php echo fo_db_e((string) ($jour['produits_prioritaires'] ?? fo_t('fridge.not_specified'))); ?>
                 </p>
 
-                <h6> Ingrédients</h6>
+                <h6><?php echo fo_e('fridge.ingredients'); ?></h6>
                 <ul>
                     <?php foreach (($jour['ingredients'] ?? []) as $ingredient): ?>
-                        <li><?php echo htmlspecialchars($ingredient); ?></li>
+                        <li><?php echo fo_db_e((string) $ingredient); ?></li>
                     <?php endforeach; ?>
                 </ul>
 
-                <h6> Étapes</h6>
+                <h6><?php echo fo_e('fridge.steps'); ?></h6>
                 <ol>
                     <?php foreach (($jour['etapes'] ?? []) as $etape): ?>
-                        <li><?php echo htmlspecialchars($etape); ?></li>
+                        <li><?php echo fo_db_e((string) $etape); ?></li>
                     <?php endforeach; ?>
                 </ol>
 
                 <div class="why-box">
-                    <strong>Pourquoi ?</strong><br>
-                    <?php echo htmlspecialchars($jour['pourquoi'] ?? ''); ?>
+                    <strong><?php echo fo_e('fridge.why'); ?></strong><br>
+                    <?php echo fo_db_e((string) ($jour['pourquoi'] ?? '')); ?>
                 </div>
 
             </div>
@@ -332,34 +354,34 @@ require __DIR__ . '/includes/nav_front.php';
             <form method="GET">
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label for="motCle" class="form-label">Rechercher par nom</label>
+                        <label for="motCle" class="form-label"><?php echo fo_e('fridge.search_name'); ?></label>
                         <input
                             type="text"
                             class="form-control"
                             id="motCle"
                             name="motCle"
-                            placeholder="Nom du produit..."
+                            placeholder="<?php echo fo_e('fridge.search_ph'); ?>"
                             value="<?php echo htmlspecialchars($motCle); ?>"
                         >
                     </div>
 
                     <div class="col-md-5">
-                        <label for="id_categorie" class="form-label">Catégorie</label>
+                        <label for="id_categorie" class="form-label"><?php echo fo_e('fridge.category'); ?></label>
                         <select class="form-select" id="id_categorie" name="id_categorie">
-                            <option value="">-- Toutes les catégories --</option>
+                            <option value=""><?php echo fo_e('fridge.all_categories'); ?></option>
                             <?php foreach ($categories as $categorie) { ?>
                                 <option
                                     value="<?php echo $categorie->getIdCategorie(); ?>"
                                     <?php echo ($idCategorie == $categorie->getIdCategorie()) ? 'selected' : ''; ?>
                                 >
-                                    <?php echo htmlspecialchars($categorie->getNom()); ?>
+                                    <?php echo fo_db_e($categorie->getNom()); ?>
                                 </option>
                             <?php } ?>
                         </select>
                     </div>
 
                     <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100">Filtrer</button>
+                        <button type="submit" class="btn btn-success w-100"><?php echo fo_e('fridge.filter'); ?></button>
                     </div>
                 </div>
             </form>
@@ -368,7 +390,7 @@ require __DIR__ . '/includes/nav_front.php';
 
     <?php if (empty($produitsFrigo)) { ?>
         <div class="alert alert-info text-center shadow-sm">
-            Votre frigo est vide.
+            <?php echo fo_e('fridge.empty'); ?>
         </div>
     <?php } else { ?>
         <div class="row">
@@ -386,64 +408,64 @@ require __DIR__ . '/includes/nav_front.php';
                                 <?php if (!empty($produit['image'])) { ?>
                                     <img
                                         src="/uploads/<?php echo htmlspecialchars($produit['image']); ?>"
-                                        alt="<?php echo htmlspecialchars($produit['nom']); ?>"
+                                        alt="<?php echo fo_db_e((string) ($produit['nom'] ?? '')); ?>"
                                         style="width: 100%; max-height: 200px; object-fit: cover; border-radius: 15px;"
                                     >
                                 <?php } else { ?>
                                     <div class="bg-light d-flex align-items-center justify-content-center rounded-4"
                                          style="height: 200px;">
-                                        <span class="text-muted">Aucune image</span>
+                                        <span class="text-muted"><?php echo fo_e('fridge.no_image'); ?></span>
                                     </div>
                                 <?php } ?>
                             </div>
 
-                            <h5 class="fw-bold mb-2"><?php echo htmlspecialchars($produit['nom']); ?></h5>
+                            <h5 class="fw-bold mb-2"><?php echo fo_db_e((string) $produit['nom']); ?></h5>
 
                             <p class="mb-2">
-                                <strong>Catégorie :</strong>
-                                <?php echo htmlspecialchars($produit['nom_categorie'] ?? 'Non classé'); ?>
+                                <strong><?php echo fo_e('fridge.category_label'); ?></strong>
+                                <?php echo fo_db_e((string) ($produit['nom_categorie'] ?? fo_t('fridge.unclassified'))); ?>
                             </p>
 
                             <p class="mb-2">
-                                <strong>Prix :</strong>
+                                <strong><?php echo fo_e('fridge.price'); ?></strong>
                                 <span class="text-success fw-bold">
                                     <?php echo htmlspecialchars($produit['prix']); ?> DT
                                 </span>
                             </p>
 
                             <p class="mb-2">
-                                <strong>Calories :</strong>
-                                <?php echo htmlspecialchars($produit['calories'] ?? 'Non défini'); ?> cal
+                                <strong><?php echo fo_e('fridge.calories'); ?></strong>
+                                <?php echo htmlspecialchars((string) ($produit['calories'] ?? fo_t('fridge.undefined'))); ?> <?php echo fo_e('products.cal_unit'); ?>
                             </p>
 
                             <p class="mb-2">
-                                <strong>Quantité :</strong>
+                                <strong><?php echo fo_e('fridge.quantity'); ?></strong>
                                 <?php echo htmlspecialchars($produit['quantite']); ?>
                             </p>
 
                             <div class="mb-3">
-                                <strong>Allergènes :</strong><br>
+                                <strong><?php echo fo_e('fridge.allergens'); ?></strong><br>
                                 <?php if (!empty($allergenes)) { ?>
                                     <?php foreach ($allergenes as $item) { ?>
                                         <span class="badge bg-danger me-1 mb-1">
-                                            <?php echo htmlspecialchars($item); ?>
+                                            <?php echo fo_db_e($item); ?>
                                         </span>
                                     <?php } ?>
                                 <?php } else { ?>
-                                    <span class="text-muted">Aucun</span>
+                                    <span class="text-muted"><?php echo fo_e('fridge.none'); ?></span>
                                 <?php } ?>
                             </div>
 
                             <div class="mb-3">
-                                <strong>Bénéfices :</strong><br>
+                                <strong><?php echo fo_e('fridge.benefits'); ?></strong><br>
                                 <?php if (!empty($benefices)) { ?>
                                     <?php foreach ($benefices as $item) { ?>
                                         <span class="badge bg-success me-1 mb-1">
-                                            <?php echo htmlspecialchars($item); ?>
+                                            <?php echo fo_db_e($item); ?>
                                         </span>
                                     <?php } ?>
                                 <?php } else { ?>
-                                    <span class="text-muted">Non précisé</span>
+                                    <span class="text-muted"><?php echo fo_e('fridge.not_specified'); ?></span>
                                 <?php } ?>
                             </div>
 
@@ -464,7 +486,7 @@ require __DIR__ . '/includes/nav_front.php';
 
                                     <div class="col-5">
                                             <button type="submit" class="btn btn-outline-success w-100 rounded-pill btn-sm">
-                                                Modifier
+                                                <?php echo fo_e('fridge.modify'); ?>
                                             </button>
                                         </form>
                                     </div>
@@ -475,7 +497,7 @@ require __DIR__ . '/includes/nav_front.php';
                                         <input type="hidden" name="action" value="supprimer">
                                         <input type="hidden" name="id_produit" value="<?php echo $produit['id_produit']; ?>">
                                         <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm">
-                                            Supprimer du frigo
+                                            <?php echo fo_e('fridge.remove'); ?>
                                         </button>
                                     </form>
                                 </div>
@@ -493,7 +515,7 @@ require __DIR__ . '/includes/nav_front.php';
 </main>
 
 <footer>
-    © 2026 HappyBite
+    <?php echo fo_e('footer.copyright'); ?>
 </footer>
 
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

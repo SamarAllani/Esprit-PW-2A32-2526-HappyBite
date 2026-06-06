@@ -22,4 +22,6 @@ function bo_layout_end(): void
     © 2026 HappyBite
 </footer>
     <?php
+    require_once __DIR__ . '/hb_brand_head.php';
+    bo_brand_render_footer();
 }

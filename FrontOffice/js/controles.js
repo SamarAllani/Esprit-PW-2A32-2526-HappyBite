@@ -130,16 +130,10 @@
     }
 
     function showFormMessage(form, text) {
-        var box = form.querySelector('.controle-js-message');
-        if (!box) {
-            box = document.createElement('p');
-            box.className = 'controle-js-message commande-flash-erreur';
-            box.setAttribute('role', 'alert');
-            form.insertBefore(box, form.firstChild);
+        hideFormMessage(form);
+        if (typeof window.hbShowActionToast === 'function') {
+            window.hbShowActionToast(text, 4000);
         }
-        box.textContent = text;
-        box.hidden = false;
-        box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     function hideFormMessage(form) {

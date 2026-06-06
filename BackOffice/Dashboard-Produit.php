@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/includes/bo_require_admin.php';
 require_once __DIR__ . '/../Controllers/ProduitController.php';
 require_once __DIR__ . '/../Controllers/CategorieController.php';
@@ -364,6 +364,8 @@ $legendColors = ['#2f8b3a', '#4cb963', '#8bc34a', '#ffca28', '#29b6f6', '#ab47bc
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <title>Dashboard Produit Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 

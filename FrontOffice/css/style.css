@@ -6,6 +6,7 @@
             --hb-forest-mid: #256b2d;
             --hb-mint: #2ec4b6;
             --hb-page-bg: #f4f7f5;
+            --hb-health-bg: linear-gradient(180deg, #eef8f1 0%, #f4fbf7 35%, #f7fcf9 100%);
             --hb-card-border: #e3ebe6;
             --hb-green-accent: #2C7E34;
             --hb-font-main: "Poppins", sans-serif;
@@ -153,10 +154,10 @@
             align-items: center;
             gap: 8px;
             padding: 6px 4px 8px;
-            border-bottom: 3px solid transparent;
+            border-bottom: none;
             text-decoration: none;
             color: inherit;
-            transition: opacity 0.2s, border-color 0.2s;
+            transition: opacity 0.2s;
         }
 
         .nav-icon-label {
@@ -184,7 +185,7 @@
         .nav-icon-link.nav-icon-active,
         .nav-profile-dropdown.nav-icon-active > .nav-profile-trigger,
         .nav-profile-dropdown[open] > .nav-profile-trigger {
-            border-bottom-color: var(--hb-forest);
+            opacity: 1;
         }
 
         .nav-cart-link:hover {

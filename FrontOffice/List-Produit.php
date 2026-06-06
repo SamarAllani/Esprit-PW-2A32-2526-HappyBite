@@ -1,7 +1,9 @@
-﻿<?php
+<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../Controllers/ProduitController.php';
 require_once __DIR__ . '/../Controllers/CategorieController.php';
@@ -24,11 +26,11 @@ $idCategorie = trim($_GET['id_categorie'] ?? '');
 $loggedIn = !empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 $idUtilisateur = $loggedIn ? (int) ($_SESSION['user_id'] ?? 0) : 0;
 $userRole = $loggedIn ? strtolower(trim((string) ($_SESSION['user_role'] ?? ''))) : '';
+$isClient = $loggedIn && $userRole === 'client';
 $isFournisseur = $loggedIn && $userRole === 'fournisseur';
-if (!$loggedIn && $action === 'smart') {
-    $action = 'normal';
-}
-if ($isFournisseur && $action === 'smart') {
+$isNutritionniste = $loggedIn && $userRole === 'nutritionniste';
+
+if (!$isClient && $action === 'smart') {
     $action = 'normal';
 }
 
@@ -43,8 +45,8 @@ if ($loggedIn && $idUtilisateur > 0) {
     $profilSante = is_array($rowProfil) ? $rowProfil : null;
 }
 
-// IA BUDGET + SANTE
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_ia_budget'] ?? '') === 'alternative_budget') {
+// IA BUDGET + SANTE (clients uniquement)
+if ($isClient && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_ia_budget'] ?? '') === 'alternative_budget') {
     $produitCher = trim($_POST['produit_cher'] ?? '');
     $budget = trim($_POST['budget'] ?? '');
 
@@ -57,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_ia_budget'] ?? '') 
 }
 
 
-if ($action === 'smart' && $loggedIn && $profilSante) {
+if ($action === 'smart' && $isClient && $profilSante) {
     $produits = $produitController->rechercherProduitsIntelligents(
         $idUtilisateur,
         $motCle,
@@ -71,10 +73,12 @@ if ($action === 'smart' && $loggedIn && $profilSante) {
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Nos Produits</title>
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
+    <title>HappyBite — <?php echo fo_e('products.title'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,34 +119,10 @@ if ($action === 'smart' && $loggedIn && $profilSante) {
             font-weight: 700;
             font-size: 1.1rem;
         }
-
-        .panier-toast {
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1100;
-            min-width: 260px;
-            max-width: 90%;
-            background: #f59e0b;
-            color: #fff;
-            border-radius: 999px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            font-weight: 600;
-            padding: 12px 20px;
-            animation: panierToastIn 0.25s ease-out;
-        }
-
-        @keyframes panierToastIn {
-            from {
-                opacity: 0;
-                transform: translate(-50%, -12px);
-            }
-            to {
-                opacity: 1;
-                transform: translate(-50%, 0);
-            }
+        .btn-hb-details {
+            font-weight: 700 !important;
+            font-size: 0.95rem;
+            padding: 0.5rem 1.35rem !important;
         }
 
         /* Même style que le bouton « Demandez-moi » (Ai.php) / CaloryEye */
@@ -184,6 +164,34 @@ if ($action === 'smart' && $loggedIn && $profilSante) {
             display: block;
             flex-shrink: 0;
         }
+
+        /* Bloc AltBite uniquement — même style que ChefBot (Frigo) */
+        .commande-wrap .hb-ai-section.altbite-section {
+            background: linear-gradient(135deg, #e8f8ef, #ffffff) !important;
+            border-radius: 24px !important;
+            padding: 28px !important;
+            margin-bottom: 1.5rem;
+            border: none !important;
+            border-left: 6px solid #43a047 !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+        }
+
+        .hb-ai-section-title {
+            margin-bottom: 12px;
+        }
+
+        .hb-gradient-title {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.55rem;
+            line-height: 1.25;
+            display: inline-block;
+            background: linear-gradient(90deg, #e53935 0%, #fb8c00 52%, #43a047 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -193,40 +201,40 @@ $nav_active = 'produits';
 require __DIR__ . '/includes/nav_front.php';
 ?>
 
-<div id="panier-toast" class="panier-toast" role="status" aria-live="polite" style="display:none;"></div>
+<?php require_once __DIR__ . '/includes/hb_action_toast.php'; hb_action_toast_render(); ?>
 
 <main class="commande-wrap">
 <div class="container py-5">
     <div class="text-center mb-4">
-        <h2 class="fw-bold">Nos Produits</h2>
-        <p class="text-muted">Choisissez selon votre besoin</p>
+        <h2 class="fw-bold"><?php echo fo_e('products.heading'); ?></h2>
+        <p class="text-muted"><?php echo fo_e('products.subheading'); ?></p>
     </div>
 
     <div class="d-flex justify-content-center gap-3 mb-4 flex-wrap">
         <a href="?action=normal" class="btn btn-outline-secondary rounded-pill px-4">
-            Tous les produits
+            <?php echo fo_e('products.all_products_mode'); ?>
         </a>
         <?php if ($loggedIn && $isFournisseur): ?>
             <a href="List-Produit-Fournisseur.php" class="btn btn-success rounded-pill px-4">
-                Ajouter produit
+                <?php echo fo_e('products.add_product'); ?>
             </a>
-        <?php elseif ($loggedIn): ?>
+        <?php elseif ($isClient): ?>
             <a href="?action=smart" class="btn btn-success rounded-pill px-4">
-                Produits personnalisés
+                <?php echo fo_e('products.personalized_btn'); ?>
             </a>
-        <?php else: ?>
-            <span class="btn btn-success rounded-pill px-4 disabled" style="opacity:0.65;cursor:not-allowed;" title="Connectez-vous pour le mode personnalisé">
-                Produits personnalisés
+        <?php elseif (!$loggedIn): ?>
+            <span class="btn btn-success rounded-pill px-4 disabled" style="opacity:0.65;cursor:not-allowed;" title="<?php echo fo_e('recipes.login_personalized'); ?>">
+                <?php echo fo_e('products.personalized_btn'); ?>
             </span>
         <?php endif; ?>
     </div>
 
-    <?php if ($action === 'smart' && $loggedIn && $profilSante) { ?>
+    <?php if ($action === 'smart' && $isClient && $profilSante) { ?>
         <div class="alert alert-success text-center shadow-sm">
-            <strong>Mode personnalisé activé :</strong><br>
+            <strong><?php echo fo_e('products.personalized_active'); ?></strong><br>
             <?php
             $infos = [];
-            foreach (['allergenes' => 'Allergènes', 'carences' => 'Carences', 'maladies' => 'Maladies'] as $field => $label) {
+            foreach (['allergenes' => fo_t('products.label_allergens'), 'carences' => fo_t('products.label_deficits'), 'maladies' => fo_t('products.label_diseases')] as $field => $label) {
                 $raw = $profilSante[$field] ?? '';
                 $items = [];
                 if (is_string($raw) && $raw !== '') {
@@ -241,96 +249,94 @@ require __DIR__ . '/includes/nav_front.php';
             }
 
             if (!empty($profilSante['objectif'])) {
-                $infos[] = 'Objectif : ' . htmlspecialchars((string) $profilSante['objectif'], ENT_QUOTES, 'UTF-8');
+                $infos[] = fo_t('products.label_goal') . ' : ' . htmlspecialchars((string) $profilSante['objectif'], ENT_QUOTES, 'UTF-8');
             }
 
-            echo !empty($infos) ? implode(' | ', $infos) : 'Votre catalogue est filtré selon votre profil (objectifs et calories).';
+            echo !empty($infos) ? implode(' | ', $infos) : fo_e('products.smart_filtered');
             ?>
         </div>
-    <?php } elseif ($action === 'smart' && $loggedIn) { ?>
+    <?php } elseif ($action === 'smart' && $isClient) { ?>
         <div class="alert alert-warning text-center shadow-sm">
-            Aucun profil santé trouvé pour votre compte. Complétez votre profil santé pour activer le mode personnalisé.
+            <?php echo fo_e('products.no_health_profile'); ?>
         </div>
     <?php } else { ?>
         <div class="alert alert-secondary text-center shadow-sm">
             <?php if ($loggedIn): ?>
-                Affichage de tous les produits disponibles
+                <?php echo fo_e('products.all_available'); ?>
             <?php else: ?>
-                Tous les produits des fournisseurs — connectez-vous pour le mode personnalisé selon votre profil santé
+                <?php echo fo_e('products.guest_hint'); ?>
             <?php endif; ?>
         </div>
     <?php } ?>
 
-    <!-- BLOC IA BUDGET + SANTE -->
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-
-            <h5 class="fw-bold mb-3">AltBite: Assistant intelligent Budget & Santé</h5>
-
-            <form method="POST">
-                <input type="hidden" name="action_ia_budget" value="alternative_budget">
-
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Produit cher ou interdit</label>
-                        <input
-                            type="text"
-                            name="produit_cher"
-                            class="form-control"
-                            placeholder="ex: saumon, lait, pain..."
-                            required
-                        >
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Budget disponible (DT)</label>
-                        <input
-                            type="number"
-                            name="budget"
-                            class="form-control"
-                            placeholder="ex: 20"
-                            min="0"
-                            step="0.1"
-                        >
-                    </div>
-
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button type="submit" class="caloryeye-analyse-btn w-100">
-                            <img src="images/analyse.png" alt="" class="caloryeye-analyse-btn__icon">
-                            <span class="caloryeye-analyse-btn__label">Trouver alternative</span>
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            <?php if (!empty($resultatIA)) { ?>
-                <div class="alert alert-info mt-3">
-                    <?php echo nl2br(htmlspecialchars($resultatIA)); ?>
-                </div>
-            <?php } ?>
-
+    <?php if ($isClient): ?>
+    <!-- BLOC IA BUDGET + SANTE (style ChefBot — titre + formulaire seulement) -->
+    <div class="hb-ai-section altbite-section shadow-sm">
+        <div class="hb-ai-section-title">
+            <h5 class="hb-gradient-title"><?php echo fo_e('products.altbite_title'); ?></h5>
         </div>
+
+        <form method="POST">
+            <input type="hidden" name="action_ia_budget" value="alternative_budget">
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label"><?php echo fo_e('products.expensive_label'); ?></label>
+                    <input
+                        type="text"
+                        name="produit_cher"
+                        class="form-control"
+                        placeholder="<?php echo fo_e('products.expensive_ph'); ?>"
+                        required
+                    >
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label"><?php echo fo_e('products.budget_label'); ?></label>
+                    <input
+                        type="number"
+                        name="budget"
+                        class="form-control"
+                        placeholder="<?php echo fo_e('products.budget_ph'); ?>"
+                        min="0"
+                        step="0.1"
+                    >
+                </div>
+
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="caloryeye-analyse-btn w-100">
+                        <img src="images/analyse.png" alt="" class="caloryeye-analyse-btn__icon">
+                        <span class="caloryeye-analyse-btn__label"><?php echo fo_e('products.find_alternative'); ?></span>
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
+
+    <?php if (!empty($resultatIA)) { ?>
+        <div class="alert alert-info shadow-sm mb-4">
+            <?php echo nl2br(htmlspecialchars($resultatIA)); ?>
+        </div>
+    <?php } ?>
+    <?php endif; ?>
 
     <div class="rayons-section mb-4">
         <div class="rayons-header mb-3">
-            <h4 class="mb-2">Nos rayons</h4>
-            <p class="mb-0">
-                Nos produits sont organisés par catégories pour vous aider.
-            </p>
+            <h4 class="mb-2"><?php echo fo_e('products.rayons'); ?></h4>
+            <p class="mb-0"><?php echo fo_e('products.rayons_desc'); ?></p>
         </div>
 
         <?php if (!empty($categories)) { ?>
             <div class="rayons-scroll">
                 <?php foreach ($categories as $categorie) { ?>
                     <div class="rayon-card-mini">
-                        <h5><?php echo htmlspecialchars($categorie->getNom()); ?></h5>
+                        <h5><?php echo fo_db_e($categorie->getNom()); ?></h5>
                         <p>
                             <?php
                             $description = trim($categorie->getDescription() ?? '');
                             echo !empty($description)
-                                ? htmlspecialchars($description)
-                                : 'Découvrez les produits de cette catégorie dans notre catalogue.';
+                                ? fo_db_e($description)
+                                : fo_e('products.category_default_desc');
                             ?>
                         </p>
                     </div>
@@ -346,21 +352,21 @@ require __DIR__ . '/includes/nav_front.php';
 
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label for="motCle" class="form-label">Rechercher un produit ou un fournisseur</label>
+                        <label for="motCle" class="form-label"><?php echo fo_e('products.search_full'); ?></label>
                         <input
                             type="text"
                             class="form-control"
                             id="motCle"
                             name="motCle"
-                            placeholder="Nom du produit, fournisseur ou promo..."
+                            placeholder="<?php echo fo_e('products.search_ph'); ?>"
                             value="<?php echo htmlspecialchars($motCle); ?>"
                         >
                     </div>
 
                     <div class="col-md-5">
-                        <label for="id_categorie" class="form-label">Catégorie</label>
+                        <label for="id_categorie" class="form-label"><?php echo fo_e('products.search_category'); ?></label>
                         <select class="form-select" id="id_categorie" name="id_categorie">
-                            <option value="">-- Toutes les catégories --</option>
+                            <option value=""><?php echo fo_e('products.all_categories'); ?></option>
                             <?php foreach ($categories as $categorie) { ?>
                                 <option
                                     value="<?php echo $categorie->getIdCategorie(); ?>"
@@ -373,7 +379,7 @@ require __DIR__ . '/includes/nav_front.php';
                     </div>
 
                     <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100">Filtrer</button>
+                        <button type="submit" class="btn btn-success w-100"><?php echo fo_e('products.filter_btn'); ?></button>
                     </div>
                 </div>
             </form>
@@ -382,7 +388,7 @@ require __DIR__ . '/includes/nav_front.php';
 
     <?php if (empty($produits)) { ?>
         <div class="alert alert-info text-center shadow-sm">
-            Aucun produit trouvé.
+            <?php echo fo_e('products.none_found'); ?>
         </div>
     <?php } else { ?>
         <div class="row">
@@ -398,7 +404,7 @@ require __DIR__ . '/includes/nav_front.php';
 
                             <?php if ($isPromo) { ?>
                                 <div class="mb-2">
-                                    <span class="promo-badge">En promo</span>
+                                    <span class="promo-badge"><?php echo fo_e('products.promo_badge'); ?></span>
                                 </div>
                             <?php } ?>
 
@@ -412,27 +418,27 @@ require __DIR__ . '/includes/nav_front.php';
                                 <?php } else { ?>
                                     <div class="bg-light d-flex align-items-center justify-content-center rounded-4"
                                          style="height: 200px;">
-                                        <span class="text-muted">Aucune image</span>
+                                        <span class="text-muted"><?php echo fo_e('product.no_image'); ?></span>
                                     </div>
                                 <?php } ?>
                             </div>
 
                             <div class="mb-3">
-                                <h5 class="fw-bold mb-1"><?php echo htmlspecialchars($produit['nom']); ?></h5>
+                                <h5 class="fw-bold mb-1"><?php echo fo_db_e($produit['nom']); ?></h5>
                                 <span class="badge bg-light text-dark">
-                                    <?php echo htmlspecialchars($produit['nom_categorie']); ?>
+                                    <?php echo fo_db_e($produit['nom_categorie']); ?>
                                 </span>
                             </div>
 
                             <p class="mb-2">
-                                <strong>Fournisseur :</strong>
+                                <strong><?php echo fo_e('product.supplier'); ?></strong>
                                 <span class="fw-semibold text-dark">
-                                    <?php echo htmlspecialchars($produit['nom_fournisseur'] ?? 'Non renseigné'); ?>
+                                    <?php echo fo_db_e($produit['nom_fournisseur'] ?? fo_t('product.supplier_unknown')); ?>
                                 </span>
                             </p>
 
                             <p class="mb-2">
-                                <strong>Prix :</strong>
+                                <strong><?php echo fo_e('product.price'); ?></strong>
                                 <?php if ($isPromo) { ?>
                                     <span class="promo-old-price">
                                         <?php echo htmlspecialchars($produit['prix']); ?> DT
@@ -448,12 +454,12 @@ require __DIR__ . '/includes/nav_front.php';
                             </p>
 
                             <p class="mb-2">
-                                <strong>Calories :</strong>
-                                <?php echo htmlspecialchars($produit['calories'] ?? 'Non défini'); ?> cal
+                                <strong><?php echo fo_e('product.calories'); ?></strong>
+                                <?php echo htmlspecialchars($produit['calories'] ?? fo_t('fridge.undefined')); ?> <?php echo fo_e('products.cal_unit'); ?>
                             </p>
 
                             <div class="mb-3">
-                                <strong>Allergènes :</strong><br>
+                                <strong><?php echo fo_e('fridge.allergens'); ?></strong><br>
                                 <?php if (!empty($allergenes)) { ?>
                                     <?php foreach ($allergenes as $item) { ?>
                                         <span class="badge bg-danger me-1 mb-1">
@@ -461,12 +467,12 @@ require __DIR__ . '/includes/nav_front.php';
                                         </span>
                                     <?php } ?>
                                 <?php } else { ?>
-                                    <span class="text-muted">Aucun</span>
+                                    <span class="text-muted"><?php echo fo_e('fridge.none'); ?></span>
                                 <?php } ?>
                             </div>
 
                             <div class="mb-3">
-                                <strong>Bénéfices :</strong><br>
+                                <strong><?php echo fo_e('fridge.benefits'); ?></strong><br>
                                 <?php if (!empty($benefices)) { ?>
                                     <?php foreach ($benefices as $item) { ?>
                                         <span class="badge bg-success me-1 mb-1">
@@ -474,29 +480,32 @@ require __DIR__ . '/includes/nav_front.php';
                                         </span>
                                     <?php } ?>
                                 <?php } else { ?>
-                                    <span class="text-muted">Non précisé</span>
+                                    <span class="text-muted"><?php echo fo_e('fridge.not_specified'); ?></span>
                                 <?php } ?>
                             </div>
 
                             <div class="mt-auto">
                                 <div class="row g-2 align-items-end">
 
-                                    <div class="col-4">
-                                        <a href="Detail-Produit.php?id=<?php echo $produit['id_produit']; ?>"
-                                           class="btn btn-outline-success w-100 rounded-pill btn-sm">
-                                            Détails
-                                        </a>
+                                    <div class="<?php echo $isFournisseur ? 'col-12' : 'col-4'; ?>">
+                                        <button type="button"
+                                                class="btn btn-outline-success w-100 rounded-pill btn-hb-details js-fo-catalog-detail"
+                                                data-detail-url="Detail-Produit.php?id=<?php echo (int) $produit['id_produit']; ?>&fragment=1"
+                                                data-detail-title="<?php echo fo_e('products.details'); ?>">
+                                            <?php echo fo_e('products.details'); ?>
+                                        </button>
                                     </div>
 
+                                    <?php if ($isClient): ?>
                                     <div class="col-4">
                                         <form method="POST" class="m-0">
                                             <input type="hidden" name="action_panier" value="ajouter_panier">
                                             <input type="hidden" name="id_produit" value="<?php echo $produit['id_produit']; ?>">
                                             <button type="button"
-                                                    class="btn btn-warning w-100 rounded-pill btn-sm js-toast-btn js-panier-btn"
+                                                    class="btn btn-hb-orange w-100 rounded-pill btn-sm js-toast-btn js-panier-btn"
                                                     data-product-id="<?php echo (int) $produit['id_produit']; ?>"
-                                                    data-toast-message="Ajouter aux panier">
-                                                Panier
+                                                    data-toast-message="<?php echo fo_e('cart.added'); ?>">
+                                                <?php echo fo_e('products.cart_btn'); ?>
                                             </button>
                                         </form>
                                     </div>
@@ -516,11 +525,12 @@ require __DIR__ . '/includes/nav_front.php';
 
                                             <button type="button"
                                                     class="btn btn-success w-100 rounded-pill btn-sm js-toast-btn js-frigo-btn"
-                                                    data-toast-message="Ajouté au frigo">
-                                                Frigo
+                                                    data-toast-message="<?php echo fo_e('products.fridge_added'); ?>">
+                                                <?php echo fo_e('products.fridge_btn'); ?>
                                             </button>
                                         </form>
                                     </div>
+                                    <?php endif; ?>
 
                                 </div>
                             </div>
@@ -536,36 +546,35 @@ require __DIR__ . '/includes/nav_front.php';
 </main>
 
 <footer>
-    © 2026 HappyBite
+    <?php echo fo_e('footer.copyright'); ?>
 </footer>
 
+<script>
+    window.HB_LIST_PRODUIT_TOAST = <?php echo json_encode([
+        'productNotFound' => fo_t('toast.product_not_found'),
+        'addFailed' => fo_t('toast.add_failed'),
+        'networkError' => fo_t('toast.network_error'),
+        'formNotFound' => fo_t('toast.form_not_found'),
+        'fridgeAddFailed' => fo_t('toast.fridge_add_failed'),
+        'add' => fo_t('toast.add'),
+        'fridgeAdded' => fo_t('products.fridge_added'),
+        'cartAdded' => fo_t('cart.added'),
+    ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+</script>
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
     (function () {
-        var toast = document.getElementById('panier-toast');
         var buttons = document.querySelectorAll('.js-toast-btn');
-        var hideTimer = null;
+        var toastMsg = window.HB_LIST_PRODUIT_TOAST || {};
 
-        if (!toast || buttons.length === 0) {
+        if (buttons.length === 0) {
             return;
         }
 
-        function hideToast() {
-            toast.style.opacity = '0';
-            setTimeout(function () {
-                toast.style.display = 'none';
-            }, 300);
-        }
-
         function showToast(message) {
-            toast.textContent = message;
-            toast.style.display = 'block';
-            toast.style.opacity = '1';
-            toast.style.transition = 'opacity 0.3s ease';
-            if (hideTimer) {
-                clearTimeout(hideTimer);
+            if (typeof window.hbShowActionToast === 'function') {
+                window.hbShowActionToast(message, 3000);
             }
-            hideTimer = setTimeout(hideToast, 2200);
         }
 
         buttons.forEach(function (button) {
@@ -574,7 +583,7 @@ require __DIR__ . '/includes/nav_front.php';
                 if (button.classList.contains('js-panier-btn')) {
                     var productId = button.dataset.productId || '';
                     if (!productId) {
-                        showToast('Produit introuvable');
+                        showToast(toastMsg.productNotFound || 'Product');
                         return;
                     }
                     button.disabled = true;
@@ -585,13 +594,13 @@ require __DIR__ . '/includes/nav_front.php';
                         .then(function (response) { return response.json(); })
                         .then(function (data) {
                             if (data && data.ok) {
-                                showToast(button.dataset.toastMessage || 'Ajouter');
+                                showToast(button.dataset.toastMessage || toastMsg.add || 'Add');
                             } else {
-                                showToast((data && data.message) ? data.message : 'Ajout impossible');
+                                showToast((data && data.message) ? data.message : (toastMsg.addFailed || 'Error'));
                             }
                         })
                         .catch(function () {
-                            showToast('Erreur reseau, reessayez');
+                            showToast(toastMsg.networkError || 'Error');
                         })
                         .finally(function () {
                             button.disabled = false;
@@ -601,7 +610,7 @@ require __DIR__ . '/includes/nav_front.php';
                 if (button.classList.contains('js-frigo-btn')) {
                     var form = button.closest('form');
                     if (!form) {
-                        showToast('Formulaire introuvable');
+                        showToast(toastMsg.formNotFound || 'Error');
                         return;
                     }
                     var pidInput = form.querySelector('[name="id_produit"]');
@@ -609,7 +618,7 @@ require __DIR__ . '/includes/nav_front.php';
                     var pid = pidInput ? String(pidInput.value || '').trim() : '';
                     var qty = qtyInput ? parseInt(String(qtyInput.value || '1'), 10) : 1;
                     if (!pid || parseInt(pid, 10) < 1) {
-                        showToast('Produit introuvable');
+                        showToast(toastMsg.productNotFound || 'Product');
                         return;
                     }
                     if (!qty || qty < 1) {
@@ -629,24 +638,28 @@ require __DIR__ . '/includes/nav_front.php';
                         .then(function (response) { return response.json(); })
                         .then(function (data) {
                             if (data && data.ok) {
-                                showToast(button.dataset.toastMessage || 'Ajouté au frigo');
+                                showToast(button.dataset.toastMessage || toastMsg.fridgeAdded || 'OK');
                             } else {
-                                showToast((data && data.message) ? data.message : 'Ajout au frigo impossible');
+                                showToast((data && data.message) ? data.message : (toastMsg.fridgeAddFailed || 'Error'));
                             }
                         })
                         .catch(function () {
-                            showToast('Erreur reseau, reessayez');
+                            showToast(toastMsg.networkError || 'Error');
                         })
                         .finally(function () {
                             button.disabled = false;
                         });
                     return;
                 }
-                showToast(button.dataset.toastMessage || 'Ajouter');
+                showToast(button.dataset.toastMessage || toastMsg.add || 'Add');
             });
         });
     })();
 </script>
+<?php
+$foDetailModalTitle = fo_t('products.details');
+require_once __DIR__ . '/includes/fo_catalog_detail_modal.php';
+?>
 </body>
 </html>
 

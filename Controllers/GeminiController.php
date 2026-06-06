@@ -1,11 +1,16 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../config/openai_key.php';
+
 class GeminiController
 {
-    // Mettez votre clé API Gemini ici ou dans un fichier .env
-    private string $apiKey = 'AIzaSyCUyU2_qiIDwd6w1BWUYsSqRy8SHRZmTlQ'; 
     private string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
+    private function apiKey(): string
+    {
+        return hb_gemini_api_key();
+    }
 
     public function generatePostIdea(): ?string
     {
@@ -15,7 +20,7 @@ class GeminiController
 
     public function translateText(string $text, string $targetLang): ?string
     {
-        $supported = ['fr', 'en', 'ar', 'de'];
+        $supported = ['fr', 'en'];
         if (!in_array($targetLang, $supported)) {
             return null;
         }
@@ -44,8 +49,9 @@ class GeminiController
 
     private function callGemini(string $prompt): ?string
     {
-        if ($this->apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-            return "Veuillez configurer votre clé API Gemini dans GeminiController.php.";
+        $apiKey = $this->apiKey();
+        if ($apiKey === '') {
+            return 'Veuillez configurer GEMINI_API_KEY dans config/secrets.php ou .env.';
         }
 
         $data = [
@@ -58,7 +64,7 @@ class GeminiController
             ]
         ];
 
-        $ch = curl_init($this->apiUrl . "?key=" . $this->apiKey);
+        $ch = curl_init($this->apiUrl . '?key=' . urlencode($apiKey));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);

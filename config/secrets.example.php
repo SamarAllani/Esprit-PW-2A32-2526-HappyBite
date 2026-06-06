@@ -10,3 +10,6 @@ declare(strict_types=1);
 if (!defined('OPENAI_API_KEY')) {
     define('OPENAI_API_KEY', 'collez-votre-cle-openai-ici');
 }
+if (!defined('GEMINI_API_KEY')) {
+    define('GEMINI_API_KEY', 'collez-votre-cle-gemini-ici');
+}

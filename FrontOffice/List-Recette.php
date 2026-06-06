@@ -1,7 +1,9 @@
-﻿<?php
+<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/includes/fo_i18n.php';
+fo_init_i18n_for_request();
 
 require_once __DIR__ . '/../Controllers/RecetteController.php';
 require_once __DIR__ . '/../Controllers/AiRecetteController.php';
@@ -17,8 +19,12 @@ $action = $_GET['action'] ?? 'normal';
 $motCle = trim($_GET['motCle'] ?? '');
 
 $loggedIn = !empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+$userRole = $loggedIn ? strtolower(trim((string) ($_SESSION['user_role'] ?? ''))) : '';
+$isClient = $loggedIn && $userRole === 'client';
+$isFournisseur = $loggedIn && $userRole === 'fournisseur';
 $idUtilisateur = $loggedIn ? (int) ($_SESSION['user_id'] ?? 0) : 0;
-if (!$loggedIn && $action === 'smart') {
+
+if (!$isClient && $action === 'smart') {
     $action = 'normal';
 }
 
@@ -32,8 +38,8 @@ if ($loggedIn && $idUtilisateur > 0) {
 
 $profilSantePourIa = is_array($profilSante) ? $profilSante : [];
 
-// TRAITEMENT IA PHOTO DIRECTEMENT DANS LA PAGE
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['image']['tmp_name'])) {
+// TRAITEMENT IA PHOTO DIRECTEMENT DANS LA PAGE (clients uniquement)
+if ($isClient && $_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['image']['tmp_name'])) {
     $imagePath = $_FILES['image']['tmp_name'];
 
     // Prévisualisation de l'image envoyée
@@ -45,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['image']['tmp_name']
     $analyseIA = $ai->analyserPlatPhoto($imagePath, $profilSantePourIa);
 }
 
-if ($action === 'smart' && $loggedIn && $profilSante) {
+if ($action === 'smart' && $isClient && $profilSante) {
     $recettes = $recetteController->rechercherRecettesIntelligentes($idUtilisateur, $motCle);
 } else {
     $recettes = !empty($motCle)
@@ -59,10 +65,12 @@ usort($recettes, function ($a, $b) {
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?php echo fo_html_lang_attr(); ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Nos Recettes</title>
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; hb_brand_render_head(); ?>
+
+    <title>HappyBite — <?php echo fo_e('recipes.title'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,34 +79,6 @@ usort($recettes, function ($a, $b) {
     <link rel="stylesheet" href="/Views/assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style-original-views.css">
     <style>
-        .panier-toast {
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1100;
-            min-width: 260px;
-            max-width: 90%;
-            background: #f59e0b;
-            color: #fff;
-            border-radius: 999px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            font-weight: 600;
-            padding: 12px 20px;
-            animation: panierToastIn 0.25s ease-out;
-        }
-
-        @keyframes panierToastIn {
-            from {
-                opacity: 0;
-                transform: translate(-50%, -12px);
-            }
-            to {
-                opacity: 1;
-                transform: translate(-50%, 0);
-            }
-        }
         .ai-image-preview {
     width: 100%;
     display: flex;
@@ -167,6 +147,39 @@ usort($recettes, function ($a, $b) {
             display: block;
             flex-shrink: 0;
         }
+
+        /* Bloc CaloryEye uniquement — même style que ChefBot (Frigo) */
+        .commande-wrap .hb-ai-section.caloryeye-section {
+            background: linear-gradient(135deg, #e8f8ef, #ffffff) !important;
+            border-radius: 24px !important;
+            padding: 28px !important;
+            margin-bottom: 1.5rem;
+            border: none !important;
+            border-left: 6px solid #43a047 !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+        }
+
+        .hb-ai-section-title {
+            margin-bottom: 12px;
+        }
+
+        .hb-gradient-title {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.55rem;
+            line-height: 1.25;
+            display: inline-block;
+            background: linear-gradient(90deg, #e53935 0%, #fb8c00 52%, #43a047 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+        .btn-hb-details {
+            font-weight: 700 !important;
+            font-size: 0.95rem;
+            padding: 0.5rem 1.35rem !important;
+        }
     </style>
 </head>
 <body>
@@ -176,50 +189,52 @@ $nav_active = 'recettes';
 require __DIR__ . '/includes/nav_front.php';
 ?>
 
-<div id="panier-toast" class="panier-toast" role="status" aria-live="polite" style="display:none;"></div>
+<?php require_once __DIR__ . '/includes/hb_action_toast.php'; hb_action_toast_render(); ?>
 
 <main class="commande-wrap">
 <div class="container py-5">
     <div class="text-center mb-4">
-        <h2 class="fw-bold">Nos Recettes</h2>
-        <p class="text-muted">Choisissez selon votre besoin</p>
+        <h2 class="fw-bold"><?php echo fo_e('recipes.heading'); ?></h2>
+        <p class="text-muted"><?php echo fo_e('recipes.subheading'); ?></p>
     </div>
 
     <div class="d-flex justify-content-center gap-3 mb-4 flex-wrap">
         <a href="?action=normal" class="btn btn-outline-secondary rounded-pill px-4">
-            Toutes les recettes
+            <?php echo fo_e('recipes.all_btn'); ?>
         </a>
-        <?php if ($loggedIn): ?>
+        <?php if ($isClient): ?>
             <a href="?action=smart" class="btn btn-success rounded-pill px-4">
-                Recettes personnalisées
+                <?php echo fo_e('recipes.personalized'); ?>
             </a>
-        <?php else: ?>
-            <span class="btn btn-success rounded-pill px-4 disabled" style="opacity:0.65;cursor:not-allowed;" title="Connectez-vous pour le mode personnalisé">
-                Recettes personnalisées
+        <?php elseif (!$loggedIn): ?>
+            <span class="btn btn-success rounded-pill px-4 disabled" style="opacity:0.65;cursor:not-allowed;" title="<?php echo fo_e('recipes.login_personalized'); ?>">
+                <?php echo fo_e('recipes.personalized'); ?>
             </span>
         <?php endif; ?>
     </div>
 
-    <!-- BLOC IA PHOTO -->
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
+    <?php if ($isClient): ?>
+    <!-- BLOC IA PHOTO (style ChefBot — titre + formulaire seulement) -->
+    <div class="hb-ai-section caloryeye-section shadow-sm">
+        <div class="hb-ai-section-title">
+            <h5 class="hb-gradient-title"><?php echo fo_e('recipes.caloryeye_title'); ?></h5>
+        </div>
 
-            <h5 class="fw-bold mb-3">CaloryEye: Analyse ton plat</h5>
-
-            <form method="POST" enctype="multipart/form-data">
-                <div class="row g-3">
-                    <div class="col-md-8">
-                        <input type="file" name="image" class="form-control" accept="image/*" required>
-                    </div>
-
-                    <div class="col-md-4">
-                        <button type="submit" class="caloryeye-analyse-btn w-100">
-                            <img src="images/analyse.png" alt="" class="caloryeye-analyse-btn__icon">
-                            <span class="caloryeye-analyse-btn__label">Analyser</span>
-                        </button>
-                    </div>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <input type="file" name="image" class="form-control" accept="image/*" required>
                 </div>
-            </form>
+
+                <div class="col-md-4">
+                    <button type="submit" class="caloryeye-analyse-btn w-100">
+                        <img src="images/analyse.png" alt="" class="caloryeye-analyse-btn__icon">
+                        <span class="caloryeye-analyse-btn__label"><?php echo fo_e('recipes.analyse_btn'); ?></span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
 
             <?php if (!empty($analyseIA)) { ?>
     <?php
@@ -240,9 +255,9 @@ require __DIR__ . '/includes/nav_front.php';
             <div class="card-body">
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">Résultat de l’analyse</h5>
+                    <h5 class="fw-bold mb-0"><?php echo fo_e('recipes.analyse_result'); ?></h5>
                     <span class="badge <?php echo $badgeClass; ?> rounded-pill px-3 py-2">
-                        Score : <?php echo htmlspecialchars($analyseData['score_sante'] ?? '-'); ?>/10
+                        <?php echo sprintf(fo_e('recipes.score_label'), htmlspecialchars($analyseData['score_sante'] ?? '-')); ?>
                     </span>
                 </div>
                 <?php if (!empty($imageAnalysePreview)) { ?>
@@ -250,7 +265,7 @@ require __DIR__ . '/includes/nav_front.php';
         <div class="ai-image-frame">
             <img
                 src="<?php echo htmlspecialchars($imageAnalysePreview); ?>"
-                alt="Plat analysé"
+                alt="<?php echo fo_e('recipes.analyzed_dish'); ?>"
             >
         </div>
     </div>
@@ -259,7 +274,7 @@ require __DIR__ . '/includes/nav_front.php';
                 <div class="row g-3 mb-3">
                     <div class="col-md-3">
                         <div class="p-3 bg-light rounded-4 text-center">
-                            <strong>Calories</strong><br>
+                            <strong><?php echo fo_e('recipes.calories'); ?></strong><br>
                             <span class="text-success fw-bold">
                                 <?php echo htmlspecialchars($analyseData['calories_estimees'] ?? '-'); ?> kcal
                             </span>
@@ -268,27 +283,27 @@ require __DIR__ . '/includes/nav_front.php';
 
                     <div class="col-md-3">
                         <div class="p-3 bg-light rounded-4 text-center">
-                            <strong>Protéines</strong><br>
+                            <strong><?php echo fo_e('recipes.proteins'); ?></strong><br>
                             <?php echo htmlspecialchars($analyseData['proteines'] ?? '-'); ?>
                         </div>
                     </div>
 
                     <div class="col-md-3">
                         <div class="p-3 bg-light rounded-4 text-center">
-                            <strong>Glucides</strong><br>
+                            <strong><?php echo fo_e('recipes.carbs'); ?></strong><br>
                             <?php echo htmlspecialchars($analyseData['glucides'] ?? '-'); ?>
                         </div>
                     </div>
 
                     <div class="col-md-3">
                         <div class="p-3 bg-light rounded-4 text-center">
-                            <strong>Lipides</strong><br>
+                            <strong><?php echo fo_e('recipes.fats'); ?></strong><br>
                             <?php echo htmlspecialchars($analyseData['lipides'] ?? '-'); ?>
                         </div>
                     </div>
                 </div>
 
-                <p><strong>Ingrédients détectés :</strong></p>
+                <p><strong><?php echo fo_e('recipes.ingredients_detected'); ?></strong></p>
                 <div class="mb-3">
                     <?php foreach (($analyseData['ingredients_detectes'] ?? []) as $ingredient) { ?>
                         <span class="badge bg-success me-1 mb-1">
@@ -297,12 +312,12 @@ require __DIR__ . '/includes/nav_front.php';
                     <?php } ?>
                 </div>
 
-                <p><strong>Analyse :</strong></p>
+                <p><strong><?php echo fo_e('recipes.analysis'); ?></strong></p>
                 <p class="text-muted">
                     <?php echo htmlspecialchars($analyseData['analyse'] ?? ''); ?>
                 </p>
 
-                <p><strong>Comment rééquilibrer :</strong></p>
+                <p><strong><?php echo fo_e('recipes.rebalance'); ?></strong></p>
                 <ul>
                     <?php foreach (($analyseData['reequilibrage'] ?? []) as $conseil) { ?>
                         <li><?php echo htmlspecialchars($conseil); ?></li>
@@ -310,13 +325,13 @@ require __DIR__ . '/includes/nav_front.php';
                 </ul>
 
                 <div class="alert alert-light border mt-3">
-                    <strong>Sport conseillé :</strong><br>
+                    <strong><?php echo fo_e('recipes.sport_advised'); ?></strong><br>
                     <?php echo htmlspecialchars($analyseData['sport_conseille'] ?? ''); ?>
                 </div>
 
                 <?php if (!empty($analyseData['avertissement_sante'])) { ?>
                     <div class="alert alert-warning mt-3">
-                        <strong>Attention santé :</strong><br>
+                        <strong><?php echo fo_e('recipes.health_warning'); ?></strong><br>
                         <?php echo htmlspecialchars($analyseData['avertissement_sante']); ?>
                     </div>
                 <?php } ?>
@@ -330,16 +345,14 @@ require __DIR__ . '/includes/nav_front.php';
         </div>
     <?php } ?>
 <?php } ?>
+    <?php endif; ?>
 
-        </div>
-    </div>
-
-    <?php if ($action === 'smart' && $loggedIn && $profilSante) { ?>
+    <?php if ($action === 'smart' && $isClient && $profilSante) { ?>
         <div class="alert alert-success text-center shadow-sm">
-            <strong>Mode personnalisé activé :</strong><br>
+            <strong><?php echo fo_e('recipes.personalized_active'); ?></strong><br>
             <?php
             $infos = [];
-            foreach (['allergenes' => 'Allergènes', 'carences' => 'Carences', 'maladies' => 'Maladies'] as $field => $label) {
+            foreach (['allergenes' => fo_t('products.label_allergens'), 'carences' => fo_t('products.label_deficits'), 'maladies' => fo_t('products.label_diseases')] as $field => $label) {
                 $raw = $profilSante[$field] ?? '';
                 $items = [];
                 if (is_string($raw) && $raw !== '') {
@@ -354,22 +367,22 @@ require __DIR__ . '/includes/nav_front.php';
             }
 
             if (!empty($profilSante['objectif'])) {
-                $infos[] = 'Objectif : ' . htmlspecialchars((string) $profilSante['objectif'], ENT_QUOTES, 'UTF-8');
+                $infos[] = fo_t('products.label_goal') . ' : ' . htmlspecialchars((string) $profilSante['objectif'], ENT_QUOTES, 'UTF-8');
             }
 
-            echo !empty($infos) ? implode(' | ', $infos) : 'Vos recettes sont filtrées selon votre profil (objectifs et calories).';
+            echo !empty($infos) ? implode(' | ', $infos) : fo_e('recipes.smart_filtered');
             ?>
         </div>
-    <?php } elseif ($action === 'smart' && $loggedIn) { ?>
+    <?php } elseif ($action === 'smart' && $isClient) { ?>
         <div class="alert alert-warning text-center shadow-sm">
-            Aucun profil santé trouvé pour votre compte. Complétez votre profil santé pour activer le mode personnalisé.
+            <?php echo fo_e('recipes.no_health_profile'); ?>
         </div>
     <?php } else { ?>
         <div class="alert alert-secondary text-center shadow-sm">
             <?php if ($loggedIn): ?>
-                Affichage de toutes les recettes disponibles
+                <?php echo fo_e('recipes.all_available'); ?>
             <?php else: ?>
-                Toutes les recettes — connectez-vous pour le mode personnalisé selon votre profil santé
+                <?php echo fo_e('recipes.guest_hint'); ?>
             <?php endif; ?>
         </div>
     <?php } ?>
@@ -385,13 +398,13 @@ require __DIR__ . '/includes/nav_front.php';
                             type="text"
                             name="motCle"
                             class="form-control"
-                            placeholder="Rechercher une recette..."
+                            placeholder="<?php echo fo_e('recipes.search_ph'); ?>"
                             value="<?php echo htmlspecialchars($motCle); ?>"
                         >
                     </div>
 
                     <div class="col-md-2">
-                        <button class="btn btn-success w-100">Rechercher</button>
+                        <button class="btn btn-success w-100"><?php echo fo_e('recipes.search_btn'); ?></button>
                     </div>
                 </div>
             </form>
@@ -400,7 +413,7 @@ require __DIR__ . '/includes/nav_front.php';
 
     <?php if (empty($recettes)) { ?>
         <div class="alert alert-info text-center">
-            Aucune recette trouvée.
+            <?php echo fo_e('recipes.none_found'); ?>
         </div>
     <?php } else { ?>
         <div class="row">
@@ -414,7 +427,7 @@ require __DIR__ . '/includes/nav_front.php';
 
                             <?php if ($miseEnAvant) { ?>
                                 <div class="mb-2">
-                                    <span class="badge rounded-pill text-bg-warning">Mise en avant</span>
+                                    <span class="badge rounded-pill text-bg-warning"><?php echo fo_e('recipes.featured_badge'); ?></span>
                                 </div>
                             <?php } ?>
 
@@ -428,60 +441,64 @@ require __DIR__ . '/includes/nav_front.php';
                                 <?php } else { ?>
                                     <div class="bg-light d-flex align-items-center justify-content-center rounded-4"
                                          style="height: 220px;">
-                                        <span class="text-muted">Aucune image</span>
+                                        <span class="text-muted"><?php echo fo_e('product.no_image'); ?></span>
                                     </div>
                                 <?php } ?>
                             </div>
 
                             <h5 class="fw-bold mb-2">
-                                <?php echo htmlspecialchars($recette['nom']); ?>
+                                <?php echo fo_db_e($recette['nom']); ?>
                             </h5>
 
                             <p class="text-muted">
-                                <?php echo htmlspecialchars($recette['description']); ?>
+                                <?php echo fo_db_e($recette['description']); ?>
                             </p>
 
                             <p>
-                                <strong>Calories :</strong>
+                                <strong><?php echo fo_e('product.calories'); ?></strong>
                                 <span class="text-success fw-bold">
-                                    <?php echo htmlspecialchars($recette['calories'] ?? 0); ?> cal
+                                    <?php echo htmlspecialchars($recette['calories'] ?? 0); ?> <?php echo fo_e('products.cal_unit'); ?>
                                 </span>
                             </p>
 
                             <div class="mb-3">
-                                <strong>Produits :</strong><br>
+                                <strong><?php echo fo_e('recipes.products_label'); ?></strong><br>
                                 <?php if (!empty($produitsRecette)) { ?>
                                     <?php foreach ($produitsRecette as $produit) { ?>
                                         <span class="badge bg-success me-1 mb-1">
-                                            <?php echo htmlspecialchars($produit['nom']); ?>
+                                            <?php echo fo_db_e($produit['nom']); ?>
                                         </span>
                                     <?php } ?>
                                 <?php } else { ?>
-                                    <span class="text-muted">Aucun produit</span>
+                                    <span class="text-muted"><?php echo fo_e('recipes.no_products'); ?></span>
                                 <?php } ?>
                             </div>
 
                             <div class="mt-auto">
                                 <div class="row g-2">
-                                    <div class="col-6">
-                                        <a href="Detail-Recette.php?id=<?php echo $recette['id_recette']; ?>&action=<?php echo urlencode($action); ?>&motCle=<?php echo urlencode($motCle); ?>"
-                                           class="btn btn-outline-success w-100 rounded-pill btn-sm">
-                                            Détails
-                                        </a>
+                                    <div class="<?php echo ($isFournisseur && !$isClient) ? 'col-12' : 'col-6'; ?>">
+                                        <button type="button"
+                                                class="btn btn-outline-success w-100 rounded-pill btn-hb-details js-fo-catalog-detail"
+                                                data-detail-url="Detail-Recette.php?id=<?php echo (int) $recette['id_recette']; ?>&fragment=1"
+                                                data-detail-title="<?php echo fo_e('recipes.details'); ?>">
+                                            <?php echo fo_e('recipes.details'); ?>
+                                        </button>
                                     </div>
 
+                                    <?php if ($isClient): ?>
                                     <div class="col-6">
                                         <form method="POST" class="m-0">
                                             <input type="hidden" name="action_panier_recette" value="ajouter_panier_recette">
                                             <input type="hidden" name="id_recette" value="<?php echo $recette['id_recette']; ?>">
                                             <button type="button"
-                                                    class="btn btn-warning w-100 rounded-pill btn-sm js-toast-btn js-panier-recette-btn"
+                                                    class="btn btn-hb-orange w-100 rounded-pill btn-sm js-toast-btn js-panier-recette-btn"
                                                     data-recette-id="<?php echo (int) $recette['id_recette']; ?>"
-                                                    data-toast-message="Ajouter aux panier">
-                                                Ajouter au panier
+                                                    data-toast-message="<?php echo fo_e('cart.added'); ?>">
+                                                <?php echo fo_e('recipes.add_cart'); ?>
                                             </button>
                                         </form>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
 
@@ -497,36 +514,22 @@ require __DIR__ . '/includes/nav_front.php';
 </main>
 
 <footer>
-    © 2026 HappyBite
+    <?php echo fo_e('footer.copyright'); ?>
 </footer>
 
 <script src="/Views/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
     (function () {
-        var toast = document.getElementById('panier-toast');
         var buttons = document.querySelectorAll('.js-toast-btn');
-        var hideTimer = null;
 
-        if (!toast || buttons.length === 0) {
+        if (buttons.length === 0) {
             return;
         }
 
-        function hideToast() {
-            toast.style.opacity = '0';
-            setTimeout(function () {
-                toast.style.display = 'none';
-            }, 300);
-        }
-
         function showToast(message) {
-            toast.textContent = message;
-            toast.style.display = 'block';
-            toast.style.opacity = '1';
-            toast.style.transition = 'opacity 0.3s ease';
-            if (hideTimer) {
-                clearTimeout(hideTimer);
+            if (typeof window.hbShowActionToast === 'function') {
+                window.hbShowActionToast(message, 3000);
             }
-            hideTimer = setTimeout(hideToast, 2200);
         }
 
         buttons.forEach(function (button) {
@@ -564,6 +567,10 @@ require __DIR__ . '/includes/nav_front.php';
         });
     })();
 </script>
+<?php
+$foDetailModalTitle = fo_t('recipes.details');
+require_once __DIR__ . '/includes/fo_catalog_detail_modal.php';
+?>
 </body>
 </html>
 

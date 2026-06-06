@@ -1,4 +1,12 @@
 <?php
+$boCatalogInline = defined('BO_CATALOG_INLINE') && BO_CATALOG_INLINE;
+
+if (!$boCatalogInline && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $q = isset($_GET['embed']) ? '?embed=1&' : '?';
+    header('Location: List-Produit.php' . $q . 'action=add#bo-inline-crud');
+    exit;
+}
+
 include __DIR__ . '/../Controllers/ProduitController.php';
 include __DIR__ . '/../Controllers/CategorieController.php';
 require_once __DIR__ . '/../Models/Produit.php';
@@ -138,9 +146,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $produitController->addProduit($produit);
 
-        header('Location: List-Produit.php');
-        exit;
+        require_once __DIR__ . '/includes/bo_inline_crud.php';
+        bo_catalog_save_redirect('List-Produit.php');
     }
+}
+
+if ($boCatalogInline) {
+    $listBackUrl = 'List-Produit.php';
+    if (isset($_GET['embed']) && (string) $_GET['embed'] !== '0') {
+        $listBackUrl .= '?embed=1';
+    }
+    require __DIR__ . '/includes/partials/bo_produit_form_inline.php';
+    return;
 }
 ?>
 
@@ -148,6 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/includes/hb_brand_head.php'; bo_brand_render_head(); ?>
+
     <title>Ajouter un produit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
