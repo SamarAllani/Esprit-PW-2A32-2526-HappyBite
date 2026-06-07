@@ -1,6 +1,8 @@
 # Installation de la base de données
 
-Deux méthodes possibles — **choisissez une seule**, ne les combinez pas.
+**Démo en ligne (sans import SQL) :** https://happybite-demo.infinityfreeapp.com/ — base déjà configurée sur InfinityFree.
+
+Deux méthodes possibles pour une **installation locale** — **choisissez une seule**, ne les combinez pas.
 
 ---
 

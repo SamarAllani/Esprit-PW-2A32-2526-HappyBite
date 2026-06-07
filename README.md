@@ -17,6 +17,23 @@ Plateforme web de nutrition intelligente **HappyBite** : recommandations personn
 
 ---
 
+## Démo en ligne
+
+**Essayer HappyBite sans installation :** [https://happybite-demo.infinityfreeapp.com/](https://happybite-demo.infinityfreeapp.com/)
+
+| Interface | Lien |
+|-----------|------|
+| Accueil | https://happybite-demo.infinityfreeapp.com/ |
+| Connexion | via le menu **Profil** → Connexion sur le site |
+| Back Office | https://happybite-demo.infinityfreeapp.com/BackOffice/login.php *(si déployé)* |
+
+**Comptes démo** — mot de passe : `password` (voir tableau ci-dessous).
+
+> Hébergement : [InfinityFree](https://www.infinityfree.com/) (démo académique).  
+> Pour une installation complète en local ou pour modifier le code, suivre la section **Installation** ci-dessous.
+
+---
+
 ## Technologies utilisées
 
 | Couche | Stack |
@@ -160,7 +177,7 @@ Fichiers locaux **non versionnés** : `config/secrets.php`, `config/mail.php`, `
 └── uploads/             # Médias uploadés (images produits, etc.)
 ```
 
-Documentation détaillée : [`docs/architecture.md`](docs/architecture.md)
+Documentation détaillée : [`docs/architecture.md`](docs/architecture.md) · [`docs/deployment.md`](docs/deployment.md)
 
 ---
 
@@ -180,9 +197,10 @@ Documentation détaillée : [`docs/architecture.md`](docs/architecture.md)
 
 ## Démo
 
+- **Application en ligne :** https://happybite-demo.infinityfreeapp.com/
 - **Présentation Canva :** https://canva.link/ferhpartzm84zrj
 - **Captures d'écran + guide évaluateur :** dossier [`demo/`](demo/) (comptes test, avertissement e-mail / mot de passe)
-- **Déploiement en ligne :** Non disponible (exécution locale via XAMPP)
+- **Installation locale :** XAMPP (voir section Installation)
 
 ---
 

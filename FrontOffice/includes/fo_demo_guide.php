@@ -46,6 +46,9 @@ function fo_render_auth_demo_guide(): void
     <details class="auth-demo-guide">
         <summary class="auth-demo-guide__title"><?php echo fo_e('auth.demo_guide_title'); ?></summary>
         <p class="auth-demo-guide__intro"><?php echo fo_e('auth.demo_guide_intro'); ?></p>
+        <p class="auth-demo-guide__online">
+            <a href="https://happybite-demo.infinityfreeapp.com/" target="_blank" rel="noopener noreferrer"><?php echo fo_e('auth.demo_online_link'); ?></a>
+        </p>
         <ul class="auth-demo-guide__list">
             <?php foreach ($accounts as $row): ?>
                 <li>

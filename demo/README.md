@@ -1,6 +1,24 @@
 # Démo — HappyBite
 
-## Présentation
+## Application en ligne (sans installation)
+
+**URL :** https://happybite-demo.infinityfreeapp.com/
+
+1. Ouvrir le lien dans un navigateur
+2. Se connecter via **Profil** → Connexion
+3. Utiliser un compte ci-dessous (mot de passe : `password`)
+
+| Rôle | E-mail | À tester |
+|------|--------|----------|
+| Admin | `admin@happybite.tn` | Back Office |
+| Fournisseur | `fournisseur@happybite.tn` | Mes produits |
+| Nutritionniste | `nutritionniste@happybite.tn` | Dashboard défis |
+| Client | ex. `sarra.benali@gmail.com` | Accueil, panier, santé, communauté |
+
+> Données déjà chargées sur le serveur (produits, posts, défis…).  
+> Les fonctionnalités **IA** peuvent être limitées sur l’hébergement gratuit si les clés API ne sont pas configurées sur le serveur.
+
+## Présentation slides
 
 **Canva :** https://canva.link/ferhpartzm84zrj
 
@@ -79,4 +97,14 @@ Sans `config/mail.php`, le changement de mot de passe par e-mail ne pourra pas a
 
 ## Déploiement en ligne
 
-Non disponible — exécution locale via XAMPP.
+| | |
+|--|--|
+| **URL publique** | https://happybite-demo.infinityfreeapp.com/ |
+| **Hébergeur** | InfinityFree (démo académique ESPRIT) |
+| **Installation locale** | XAMPP + `database/happybite_full_demo.sql` (voir [`README.md`](../README.md)) |
+
+### Fiche de soumission ESPRIT — champ « Lien de déploiement »
+
+```text
+https://happybite-demo.infinityfreeapp.com/
+```

@@ -278,6 +278,7 @@ return [
     'auth.face_after_register' => 'Après inscription, sur la page de connexion vous pourrez enregistrer Face ID (caméra), comme pour valider une commande.',
     'auth.demo_guide_title' => 'Guide démo — comptes de test (ESPRIT)',
     'auth.demo_guide_intro' => 'Comptes fictifs pour comparer les rôles. Mot de passe commun : password',
+    'auth.demo_online_link' => 'Démo en ligne : https://happybite-demo.infinityfreeapp.com/',
     'auth.demo_role_admin' => 'Administrateur',
     'auth.demo_role_fournisseur' => 'Fournisseur',
     'auth.demo_role_nutritionniste' => 'Nutritionniste',

@@ -278,6 +278,7 @@ return [
     'auth.face_after_register' => 'After signing up, on the login page you can register Face ID (camera), as when confirming an order.',
     'auth.demo_guide_title' => 'Demo guide — test accounts (ESPRIT)',
     'auth.demo_guide_intro' => 'Fake accounts to compare roles. Shared password: password',
+    'auth.demo_online_link' => 'Live demo: https://happybite-demo.infinityfreeapp.com/',
     'auth.demo_role_admin' => 'Administrator',
     'auth.demo_role_fournisseur' => 'Supplier',
     'auth.demo_role_nutritionniste' => 'Nutritionist',
