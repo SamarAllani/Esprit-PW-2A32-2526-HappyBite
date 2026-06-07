@@ -20,7 +20,8 @@
 
 ## Présentation slides
 
-**Canva :** https://canva.link/ferhpartzm84zrj
+**Canva (EN) :** https://canva.link/js121k5g6a4w3eg  
+**Canva (FR) :** https://canva.link/cssc5bbw9zm0l3z
 
 ## Base de données démo
 

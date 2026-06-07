@@ -198,7 +198,8 @@ Documentation détaillée : [`docs/architecture.md`](docs/architecture.md) · [`
 ## Démo
 
 - **Application en ligne :** https://happybite-demo.infinityfreeapp.com/
-- **Présentation Canva :** https://canva.link/ferhpartzm84zrj
+- **Présentation Canva (EN) :** https://canva.link/js121k5g6a4w3eg
+- **Présentation Canva (FR) :** https://canva.link/cssc5bbw9zm0l3z
 - **Captures d'écran + guide évaluateur :** dossier [`demo/`](demo/) (comptes test, avertissement e-mail / mot de passe)
 - **Installation locale :** XAMPP (voir section Installation)
 

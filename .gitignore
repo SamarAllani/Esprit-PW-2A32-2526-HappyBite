@@ -11,6 +11,9 @@ uploads/face_auth/*
 uploads/users pictures/*
 !uploads/users pictures/.gitkeep
 
+# Outils locaux (binaires / tunnels)
+tools/
+
 # IDE / OS
 .idea/
 .vscode/

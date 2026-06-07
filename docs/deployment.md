@@ -25,6 +25,11 @@ Aucune installation requise pour tester l’interface : ouvrir l’URL, se conne
 - **E-mail** (changement mot de passe) : nécessite `config/mail.php` (SMTP Gmail)
 - **Face ID** : peut être limité selon le navigateur et HTTPS
 
+## Présentation
+
+- **Canva (EN) :** https://canva.link/js121k5g6a4w3eg
+- **Canva (FR) :** https://canva.link/cssc5bbw9zm0l3z
+
 ## Installation locale (développement)
 
 Voir le [`README.md`](../README.md) à la racine du dépôt (XAMPP + `database/happybite_full_demo.sql`).
